@@ -1,0 +1,44 @@
+{
+  "name": "@pacaf/wizard",
+  "version": "3.1.5",
+  "private": false,
+  "type": "module",
+  "description": "Interactive CLI setup wizard for Power Apps Code Apps.",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/martycarreras-psnl/PAppsCAFoundations.git",
+    "directory": "packages/wizard"
+  },
+  "homepage": "https://martycarreras-psnl.github.io/PAppsCAFoundations",
+  "bin": {
+    "pacaf-wizard": "./index.mjs"
+  },
+  "main": "./index.mjs",
+  "files": [
+    "index.mjs",
+    "lib/",
+    "steps/",
+    "README.md"
+  ],
+  "scripts": {
+    "start": "node index.mjs"
+  },
+  "dependencies": {
+    "@inquirer/prompts": "^7.0.0",
+    "@pacaf/agent-instructions": "workspace:*",
+    "@pacaf/scripts": "workspace:*",
+    "chalk": "^5.3.0"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "keywords": [
+    "power-apps",
+    "code-apps",
+    "power-platform",
+    "wizard",
+    "scaffold",
+    "pacaf"
+  ]
+}

@@ -1,0 +1,220 @@
+name: Issue Triage
+
+on:
+  issues:
+    types: [opened]
+  issue_comment:
+    types: [created]
+
+permissions:
+  issues: write
+  contents: read
+
+jobs:
+  triage:
+    name: AI Triage
+    # For issue_comment events: only run when a maintainer types /triage
+    if: |
+      github.event_name == 'issues' ||
+      (github.event_name == 'issue_comment' && contains(github.event.comment.body, '/triage'))
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: |
+            packages
+            .github/instructions
+            AGENTS.md
+            README.md
+          sparse-checkout-cone-mode: false
+
+      - name: Gather repo context
+        id: context
+        run: |
+          # Build a compact map of the repo structure for the AI
+          echo "## File inventory" > /tmp/repo-context.md
+          find packages -name '*.mjs' -o -name '*.ts' -o -name '*.json' | head -80 >> /tmp/repo-context.md
+          echo "" >> /tmp/repo-context.md
+          echo "## Package.json files" >> /tmp/repo-context.md
+          for pkg in packages/*/package.json; do
+            echo "### $pkg" >> /tmp/repo-context.md
+            cat "$pkg" | head -30 >> /tmp/repo-context.md
+            echo "" >> /tmp/repo-context.md
+          done
+
+      - name: Triage with AI
+        uses: actions/github-script@v7
+        env:
+          ISSUE_TITLE: ${{ github.event.issue.title }}
+          ISSUE_BODY: ${{ github.event.issue.body }}
+          ISSUE_NUMBER: ${{ github.event.issue.number }}
+          ISSUE_AUTHOR: ${{ github.event.issue.user.login }}
+          ISSUE_LABELS: ${{ join(github.event.issue.labels.*.name, ', ') }}
+          AZURE_AI_ENDPOINT: ${{ secrets.AZURE_AI_ENDPOINT }}
+          AZURE_AI_KEY: ${{ secrets.AZURE_AI_KEY }}
+        with:
+          script: |
+            const fs = require('fs');
+            const repoContext = fs.readFileSync('/tmp/repo-context.md', 'utf-8');
+
+            const systemPrompt = `You are an expert issue triager for the PAppsCAFoundations repository — a pnpm monorepo that publishes @pacaf/* npm packages (wizard, wizard-ux, scripts, agent-instructions, rebrand) for Power Apps Code Apps.
+
+            Your job is to analyze incoming GitHub issues and provide a structured triage assessment. Be concise, direct, and actionable.
+
+            When assessing severity:
+            - P0 (Critical): Blocks all users from installing, running the wizard, or deploying. No workaround.
+            - P1 (High): Breaks a core workflow but has a workaround, OR affects many users.
+            - P2 (Medium): Affects a specific scenario, workaround exists, or is a documentation gap.
+            - P3 (Low): Enhancement request, cosmetic issue, or edge case.
+
+            When assessing effort:
+            - Trivial: One-line config or typo fix, < 10 minutes
+            - Small: A few files, < 1 hour
+            - Medium: Multiple files or requires testing across packages, half a day
+            - Large: Architectural change, multi-day effort
+
+            IMPORTANT: If the issue contains a suggested fix, evaluate whether the suggestion is correct. If it references specific files, check against the repo context provided.`;
+
+            const userPrompt = `## Issue #${process.env.ISSUE_NUMBER}
+            **Title:** ${process.env.ISSUE_TITLE}
+            **Author:** ${process.env.ISSUE_AUTHOR}
+            **Labels:** ${process.env.ISSUE_LABELS || 'none'}
+
+            **Body:**
+            ${process.env.ISSUE_BODY}
+
+            ---
+
+            ## Repo context
+            ${repoContext}
+
+            ---
+
+            Provide your triage in exactly this format:
+
+            ### 🔍 Triage Summary
+
+            **Priority:** P0/P1/P2/P3 — (one-line justification)
+            **Effort:** Trivial/Small/Medium/Large — (one-line justification)
+            **Affected package(s):** @pacaf/xxx
+            **Blocks release:** Yes/No
+
+            ### 📋 Assessment
+
+            (2-4 sentences: Is the issue valid? Is the root cause correctly identified? Is the suggested fix correct? Any risks?)
+
+            ### ✅ Recommendation
+
+            (One of: "Fix immediately before next release", "Fix in the next patch", "Backlog — not urgent", "Needs more info from reporter", "Won't fix — explain why")
+
+            ### 🔧 Fix guidance
+
+            (If applicable: which file(s) to change, what the change is, and any testing needed)`;
+
+            // Call Azure AI Foundry (serverless model deployment)
+            const endpoint = process.env.AZURE_AI_ENDPOINT;
+            const apiKey = process.env.AZURE_AI_KEY;
+
+            if (!endpoint || !apiKey) {
+              core.warning('AZURE_AI_ENDPOINT or AZURE_AI_KEY secret is not set');
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: parseInt(process.env.ISSUE_NUMBER),
+                body: `⚠️ Automated triage could not complete — \`AZURE_AI_ENDPOINT\` or \`AZURE_AI_KEY\` secret is missing. A maintainer will review this issue manually.`
+              });
+              return;
+            }
+
+            // Kimi-K2.6 uses OpenAI-compatible endpoint format
+            const url = `${endpoint}/openai/v1/chat/completions`;
+
+            const response = await fetch(url, {
+              method: 'POST',
+              headers: {
+                'api-key': apiKey,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: 'Kimi-K2.6',
+                messages: [
+                  { role: 'system', content: systemPrompt },
+                  { role: 'user', content: userPrompt }
+                ],
+                temperature: 0.3,
+                max_tokens: 1500
+              })
+            });
+
+            if (!response.ok) {
+              const errText = await response.text();
+              core.warning(`Azure AI Foundry API returned ${response.status}: ${errText}`);
+              // Fall back to a simple comment
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: parseInt(process.env.ISSUE_NUMBER),
+                body: `⚠️ Automated triage could not complete (Azure AI Foundry returned ${response.status}). A maintainer will review this issue manually.`
+              });
+              return;
+            }
+
+            const data = await response.json();
+            // Kimi-K2.6 is a reasoning model — it may put its response in
+            // reasoning_content instead of content depending on the prompt
+            const triageText = data.choices?.[0]?.message?.content
+                            || data.choices?.[0]?.message?.reasoning_content;
+
+            if (!triageText) {
+              core.warning('No triage content returned from model');
+              return;
+            }
+
+            // Determine priority label from the response
+            let priorityLabel = null;
+            if (triageText.includes('**Priority:** P0')) priorityLabel = 'p0-critical';
+            else if (triageText.includes('**Priority:** P1')) priorityLabel = 'p1-high';
+            else if (triageText.includes('**Priority:** P2')) priorityLabel = 'p2-medium';
+            else if (triageText.includes('**Priority:** P3')) priorityLabel = 'p3-low';
+
+            // Post the triage comment
+            await github.rest.issues.createComment({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              issue_number: parseInt(process.env.ISSUE_NUMBER),
+              body: `## 🤖 Automated Triage\n\n${triageText}\n\n---\n<sub>This assessment was generated automatically. A maintainer will confirm or adjust.</sub>`
+            });
+
+            // Add priority label if we detected one
+            if (priorityLabel) {
+              try {
+                // Ensure the label exists
+                try {
+                  await github.rest.issues.getLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: priorityLabel
+                  });
+                } catch {
+                  const colors = { 'p0-critical': 'b60205', 'p1-high': 'd93f0b', 'p2-medium': 'fbca04', 'p3-low': '0e8a16' };
+                  await github.rest.issues.createLabel({
+                    owner: context.repo.owner,
+                    repo: context.repo.repo,
+                    name: priorityLabel,
+                    color: colors[priorityLabel] || 'cccccc',
+                    description: `Priority: ${priorityLabel.replace('p', 'P').replace('-', ' — ')}`
+                  });
+                }
+                await github.rest.issues.addLabels({
+                  owner: context.repo.owner,
+                  repo: context.repo.repo,
+                  issue_number: parseInt(process.env.ISSUE_NUMBER),
+                  labels: [priorityLabel]
+                });
+              } catch (labelErr) {
+                core.warning(`Could not add label: ${labelErr.message}`);
+              }
+            }
+
+            console.log(`Triage posted for issue #${process.env.ISSUE_NUMBER} — ${priorityLabel || 'no priority detected'}`);

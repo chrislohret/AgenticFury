@@ -1,0 +1,87 @@
+---
+globs: "**"
+alwaysApply: true
+description: "Loaded on every interaction. Gates the agent on real prerequisite verification (Node.js, npm, Git, .NET SDK, PAC CLI, Python / py launcher) before any wizard/scaffold attempt. If anything is missing, stop and tell the user clearly — agents cannot install these for the user."
+---
+<!-- Generated from .github/instructions/00-prereq-gate.instructions.md — do not edit directly -->
+# Prerequisite Gate — Stop Before You Help
+
+Before running `npx @pacaf/wizard-ux@latest`, `pac` commands, `dotnet tool install`, or any tool that depends on Node.js/.NET/Python, **verify the user has the prerequisites installed**.
+
+## When to gate
+- Fresh repo (no `package.json`, no `src/`, no `power.config.json`)
+- User says "set up", "run the wizard", "get me started", "new machine"
+- A command in this session failed with `command not found` / `is not recognized` / `npx: command not found` / `pac: command not found`
+
+## The check (one at a time, no `&&`)
+```bash
+node --version
+npm --version
+git --version
+dotnet --version
+pac help
+```
+Windows: `py -V`. macOS/Linux: `python3 --version`.
+
+## Before declaring missing — probe canonical install path
+
+Many "command not found" reports are PATH problems, not install problems. The classic macOS/zsh case: a `PATH` entry that contains a literal unexpanded `~` (e.g. `~/.dotnet/tools`). zsh and bash do not tilde-expand inside `PATH` — `which pac` fails even though `$HOME/.dotnet/tools/pac` exists and runs.
+
+Before firing the missing-tool stop block, test the canonical install path directly:
+
+| Tool | macOS / Linux | Windows |
+|---|---|---|
+| `pac` | `$HOME/.dotnet/tools/pac` | `%USERPROFILE%\.dotnet\tools\pac.exe` |
+| `dotnet` | `/usr/local/share/dotnet/dotnet` | `%ProgramFiles%\dotnet\dotnet.exe` |
+| `node` | `/usr/local/bin/node`, `/opt/homebrew/bin/node` | `%ProgramFiles%\nodejs\node.exe` |
+| `git` | `/usr/bin/git`, `/usr/local/bin/git`, `/opt/homebrew/bin/git` | `%ProgramFiles%\Git\cmd\git.exe` |
+
+If the binary runs from the absolute path but `which`/`Get-Command` fails, this is a **broken PATH**, not a **missing tool**. Output the PATH-fix stop block — do not advise reinstalling:
+
+```
+🛑 <Tool> installed but not on PATH
+
+<Tool> exists at <canonical path> but the shell cannot find it.
+On macOS/Linux this is almost always a PATH entry containing a literal `~`.
+
+  # zsh (macOS default)
+  echo 'export PATH="$HOME/.dotnet/tools:$PATH"' >> ~/.zshrc && exec zsh
+
+  # PowerShell (Windows)
+  [Environment]::SetEnvironmentVariable(
+    'Path', "$env:Path;$env:USERPROFILE\.dotnet\tools", 'User')
+```
+
+## If a tool is genuinely missing — STOP
+
+Output:
+```
+🛑 Prerequisite missing — only you can install this
+
+  ❌ <Tool> — <why needed>
+       Install: <official link>
+       Verify:  <command>
+
+✅ Already installed: <passing tools>
+
+Why I can't do this for you: installer/admin/PATH — close and reopen the
+VS Code terminal after install, then say "ready" and I'll re-check.
+
+Full guide: docs/prerequisite-setup.md
+```
+Then stop. Do not auto-`winget`/`brew`/`choco`/`apt` — those have their own elevation, proxy, and SSL-inspection failure modes you will end up debugging.
+
+## Windows gotchas
+- `python3` → Microsoft Store stub. Test with `py -V`.
+- VS Code default terminal often `cmd.exe`. Command Palette → **Terminal: Select Default Profile** → **PowerShell**.
+- `pac` lives in `%USERPROFILE%\.dotnet\tools` — restart terminal after `dotnet tool install`.
+- `npx` exit code 9009 = Node missing or terminal not restarted.
+- Corporate SSL inspection → cert errors on `npm`/`dotnet`/`pip`. Diagnose, do not retry.
+- OneDrive Files On-Demand → permission errors. Recommend "Always keep on this device" or move repo.
+
+## macOS gotchas
+- First `git --version` triggers Xcode CLT GUI installer (user-only).
+- Homebrew on Apple Silicon = `/opt/homebrew`; Intel = `/usr/local`. Must `eval "$(/opt/homebrew/bin/brew shellenv)"`.
+- **`PATH` entries with literal `~` are silently broken in zsh/bash.** Use `$HOME/.dotnet/tools`, not `~/.dotnet/tools`. The canonical-path probe above catches this.
+
+Full details: `.github/instructions/00-prereq-gate.instructions.md`
