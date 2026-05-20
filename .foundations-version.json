@@ -1,30 +1,6 @@
 {
-  "layout": "thin",
-  "scope": "@pacaf",
-  "packageVersions": {
-    "@pacaf/wizard": "1.0.0",
-    "@pacaf/wizard-ux": "1.0.0",
-    "@pacaf/scripts": "1.0.0",
-    "@pacaf/agent-instructions": "1.0.0",
-    "@pacaf/rebrand": "1.0.0"
-  },
-  "releasedAt": "2026-05-11",
-  "capabilities": [
-    "thin-layout",
-    "scoped-npm-publishing",
-    "fork-rebrand",
-    "instruction-drift-detection",
-    "pnpm-workspace",
-    "browser-setup-wizard",
-    "cli-setup-wizard",
-    "migrate-thin-bin"
-  ],
-  "notes": [
-    "This repo is now a pnpm monorepo that publishes the @pacaf/* packages.",
-    "Derived repos no longer carry wizard/, wizard-ux/, scripts/, or docs/ trees.",
-    "Run npx @pacaf/wizard-ux@latest in a new repo to scaffold a Code App.",
-    "Run npx pacaf-update in an existing derived repo to refresh scripts and instructions.",
-    "Run npx pacaf-migrate-thin in a legacy 'fat' derived repo to convert it.",
-    "Forkers: see FORKING.md and run packages/rebrand/bin/pacaf-rebrand.mjs to retarget scope/prefix."
-  ]
+  "package": "@pacaf/agent-instructions",
+  "version": "3.4.0",
+  "installedAt": "2026-05-20T12:28:37.951Z",
+  "layout": "thin"
 }
