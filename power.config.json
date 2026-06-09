@@ -1,6 +1,6 @@
 {
   "version": "1.0",
-  "appId": null,
+  "appId": "8a9fdb7f-43cb-4fed-b317-40640ee76e8c",
   "appDisplayName": "AgenticFury App",
   "region": "prod",
   "environmentId": "531d75e6-c77e-e589-9297-2e8227a6600f",
@@ -9,6 +9,63 @@
   "buildEntryPoint": "index.html",
   "localAppUrl": "http://localhost:3000",
   "logoPath": "Default",
-  "connectionReferences": {},
-  "databaseReferences": {}
+  "connectionReferences": {
+    "152441f9-6f65-4cea-96ec-5dca0e3d4166": {
+      "id": "/providers/Microsoft.PowerApps/apis/shared_commondataserviceforapps",
+      "displayName": "Microsoft Dataverse",
+      "dataSources": [
+        "commondataserviceforapps"
+      ],
+      "authenticationType": "Oauth",
+      "dataSets": {}
+    },
+    "3b7e328a-db1e-4336-abcf-697199599c14": {
+      "id": "/providers/Microsoft.PowerApps/apis/shared_microsoftcopilotstudio",
+      "displayName": "Microsoft Copilot Studio",
+      "dataSources": [
+        "microsoftcopilotstudio"
+      ],
+      "authenticationType": "oauthDefault",
+      "dataSets": {}
+    }
+  },
+  "databaseReferences": {
+    "default.cds": {
+      "dataSources": {
+        "idearequirements": {
+          "entitySetName": "afp_idearequirements",
+          "logicalName": "afp_idearequirement"
+        },
+        "approvalstagerecords": {
+          "entitySetName": "afp_approvalstagerecords",
+          "logicalName": "afp_approvalstagerecord"
+        },
+        "lookupoptions": {
+          "entitySetName": "afp_lookupoptions",
+          "logicalName": "afp_lookupoption"
+        },
+        "coestructuredreviews": {
+          "entitySetName": "afp_coestructuredreviews",
+          "logicalName": "afp_coestructuredreview"
+        },
+        "coestructuredreviewselections": {
+          "entitySetName": "afp_coestructuredreviewselections",
+          "logicalName": "afp_coestructuredreviewselection"
+        },
+        "aicoeteammembers": {
+          "entitySetName": "afp_aicoeteammembers",
+          "logicalName": "afp_aicoeteammember"
+        },
+        "aicoeteamapprovals": {
+          "entitySetName": "afp_aicoeteamapprovals",
+          "logicalName": "afp_aicoeteamapproval"
+        },
+        "approvalhistoryentries": {
+          "entitySetName": "afp_approvalhistoryentries",
+          "logicalName": "afp_approvalhistoryentry"
+        }
+      },
+      "environmentVariableName": ""
+    }
+  }
 }

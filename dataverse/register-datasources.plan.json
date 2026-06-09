@@ -1,0 +1,24 @@
+{
+  "generatedAt": "2026-06-03T20:22:51.593Z",
+  "sourcePlan": "dataverse\\planning-payload.json",
+  "dataverseTables": [
+    "afp_idearequirements",
+    "afp_approvalstagerecords",
+    "afp_lookupoptions",
+    "afp_coestructuredreviews",
+    "afp_coestructuredreviewselections",
+    "afp_aicoeteammembers",
+    "afp_aicoeteamapprovals",
+    "afp_approvalhistoryentries"
+  ],
+  "pacCommands": [
+    "~/.dotnet/tools/pac code add-data-source -a dataverse -t afp_idearequirements",
+    "~/.dotnet/tools/pac code add-data-source -a dataverse -t afp_approvalstagerecords",
+    "~/.dotnet/tools/pac code add-data-source -a dataverse -t afp_lookupoptions",
+    "~/.dotnet/tools/pac code add-data-source -a dataverse -t afp_coestructuredreviews",
+    "~/.dotnet/tools/pac code add-data-source -a dataverse -t afp_coestructuredreviewselections",
+    "~/.dotnet/tools/pac code add-data-source -a dataverse -t afp_aicoeteammembers",
+    "~/.dotnet/tools/pac code add-data-source -a dataverse -t afp_aicoeteamapprovals",
+    "~/.dotnet/tools/pac code add-data-source -a dataverse -t afp_approvalhistoryentries"
+  ]
+}

@@ -1,0 +1,88 @@
+import type { DirectoryUser } from '@/types/domain-models';
+
+export const mockDirectoryUsers: DirectoryUser[] = [
+  {
+    id: 'usr-1',
+    displayName: 'Alex Johnson',
+    email: 'alex.johnson@contoso.com',
+    department: 'IT',
+    jobTitle: 'AI Engineer',
+  },
+  {
+    id: 'usr-2',
+    displayName: 'Priya Sharma',
+    email: 'priya.sharma@contoso.com',
+    department: 'AI CoE',
+    jobTitle: 'CoE Program Lead',
+  },
+  {
+    id: 'usr-3',
+    displayName: 'Marcus Williams',
+    email: 'marcus.williams@contoso.com',
+    department: 'Finance',
+    jobTitle: 'Finance Business Analyst',
+  },
+  {
+    id: 'usr-4',
+    displayName: 'Sarah Chen',
+    email: 'sarah.chen@contoso.com',
+    department: 'IT Security',
+    jobTitle: 'Security Architect',
+  },
+  {
+    id: 'usr-5',
+    displayName: 'David Okonkwo',
+    email: 'david.okonkwo@contoso.com',
+    department: 'Legal',
+    jobTitle: 'Legal Counsel',
+  },
+  {
+    id: 'usr-6',
+    displayName: 'Emily Rodriguez',
+    email: 'emily.rodriguez@contoso.com',
+    department: 'Human Resources',
+    jobTitle: 'HR Business Partner',
+  },
+  {
+    id: 'usr-7',
+    displayName: 'James Park',
+    email: 'james.park@contoso.com',
+    department: 'AI CoE',
+    jobTitle: 'Machine Learning Architect',
+  },
+  {
+    id: 'usr-8',
+    displayName: 'Fatima Al-Hassan',
+    email: 'fatima.al-hassan@contoso.com',
+    department: 'Procurement',
+    jobTitle: 'Supply Chain Analyst',
+  },
+  {
+    id: 'usr-9',
+    displayName: 'Thomas Mueller',
+    email: 'thomas.mueller@contoso.com',
+    department: 'Executive',
+    jobTitle: 'Chief Technology Officer',
+  },
+  {
+    id: 'usr-10',
+    displayName: 'Yuki Tanaka',
+    email: 'yuki.tanaka@contoso.com',
+    department: 'Data & Analytics',
+    jobTitle: 'Data Governance Lead',
+  },
+  {
+    id: 'usr-11',
+    displayName: 'Carlos Mendez',
+    email: 'carlos.mendez@contoso.com',
+    department: 'Customer Experience',
+    jobTitle: 'CX Transformation Lead',
+  },
+  {
+    id: 'usr-12',
+    displayName: 'Nina Patel',
+    email: 'nina.patel@contoso.com',
+    department: 'AI CoE',
+    jobTitle: 'Ethics & Responsible AI Lead',
+  },
+];

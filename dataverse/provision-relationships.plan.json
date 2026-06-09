@@ -1,0 +1,86 @@
+{
+  "generatedAt": "2026-06-03T20:22:51.593Z",
+  "sourcePlan": "dataverse\\planning-payload.json",
+  "relationships": [
+    {
+      "type": "ManyToOne",
+      "fromTable": "afp_approvalstagerecord",
+      "toTable": "afp_idearequirement",
+      "referencingEntity": "afp_approvalstagerecord",
+      "referencedEntity": "afp_idearequirement",
+      "schemaName": "afp_ApprovalStageRecord_IdeaRequirement",
+      "lookupSchemaName": "afp_SubmissionId",
+      "lookupDisplayName": "Submission"
+    },
+    {
+      "type": "ManyToOne",
+      "fromTable": "afp_coestructuredreview",
+      "toTable": "afp_idearequirement",
+      "referencingEntity": "afp_coestructuredreview",
+      "referencedEntity": "afp_idearequirement",
+      "schemaName": "afp_CoeStructuredReview_IdeaRequirement",
+      "lookupSchemaName": "afp_SubmissionId",
+      "lookupDisplayName": "Submission"
+    },
+    {
+      "type": "ManyToOne",
+      "fromTable": "afp_coestructuredreviewselection",
+      "toTable": "afp_coestructuredreview",
+      "referencingEntity": "afp_coestructuredreviewselection",
+      "referencedEntity": "afp_coestructuredreview",
+      "schemaName": "afp_CoeStructuredReviewSelection_CoeStructuredReview",
+      "lookupSchemaName": "afp_ReviewId",
+      "lookupDisplayName": "Review"
+    },
+    {
+      "type": "ManyToOne",
+      "fromTable": "afp_coestructuredreviewselection",
+      "toTable": "afp_lookupoption",
+      "referencingEntity": "afp_coestructuredreviewselection",
+      "referencedEntity": "afp_lookupoption",
+      "schemaName": "afp_CoeStructuredReviewSelection_LookupOption",
+      "lookupSchemaName": "afp_LookupOptionId",
+      "lookupDisplayName": "Lookup Option"
+    },
+    {
+      "type": "ManyToOne",
+      "fromTable": "afp_aicoeteammember",
+      "toTable": "afp_lookupoption",
+      "referencingEntity": "afp_aicoeteammember",
+      "referencedEntity": "afp_lookupoption",
+      "schemaName": "afp_AiCoeTeamMember_LookupOption",
+      "lookupSchemaName": "afp_RoleId",
+      "lookupDisplayName": "Role"
+    },
+    {
+      "type": "ManyToOne",
+      "fromTable": "afp_aicoeteamapproval",
+      "toTable": "afp_idearequirement",
+      "referencingEntity": "afp_aicoeteamapproval",
+      "referencedEntity": "afp_idearequirement",
+      "schemaName": "afp_AiCoeTeamApproval_IdeaRequirement",
+      "lookupSchemaName": "afp_SubmissionId",
+      "lookupDisplayName": "Submission"
+    },
+    {
+      "type": "ManyToOne",
+      "fromTable": "afp_aicoeteamapproval",
+      "toTable": "afp_aicoeteammember",
+      "referencingEntity": "afp_aicoeteamapproval",
+      "referencedEntity": "afp_aicoeteammember",
+      "schemaName": "afp_AiCoeTeamApproval_AiCoeTeamMember",
+      "lookupSchemaName": "afp_TeamMemberId",
+      "lookupDisplayName": "Team Member"
+    },
+    {
+      "type": "ManyToOne",
+      "fromTable": "afp_approvalhistoryentry",
+      "toTable": "afp_idearequirement",
+      "referencingEntity": "afp_approvalhistoryentry",
+      "referencedEntity": "afp_idearequirement",
+      "schemaName": "afp_ApprovalHistoryEntry_IdeaRequirement",
+      "lookupSchemaName": "afp_SubmissionId",
+      "lookupDisplayName": "Submission"
+    }
+  ]
+}

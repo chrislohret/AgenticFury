@@ -1,63 +1,545 @@
 {
   "domains": [
     {
-      "name": "Project Intake",
-      "description": "Business language and boundaries for the app"
+      "name": "Agentic AI Use Case Intake",
+      "description": "Captures, evaluates, and tracks employee-submitted Agentic AI use case ideas through a multi-stage CoE approval pipeline."
     }
   ],
+  "publisherPrefix": "afp",
   "tables": [
     {
-      "schemaName": "yourprefix_ProjectRequest",
-      "displayName": "Project Request",
-      "displayCollectionName": "Project Requests",
-      "logicalSingularName": "yourprefix_projectrequest",
-      "logicalPluralName": "yourprefix_projectrequests",
-      "entitySetName": "yourprefix_projectrequests",
-      "tableLogicalName": "yourprefix_projectrequests",
-      "description": "Tracks incoming requests for work",
+      "schemaName": "afp_IdeaRequirement",
+      "displayName": "Idea Requirement",
+      "displayCollectionName": "Idea Requirements",
+      "logicalSingularName": "afp_idearequirement",
+      "logicalPluralName": "afp_idearequirements",
+      "entitySetName": "afp_idearequirements",
+      "tableLogicalName": "afp_idearequirements",
+      "description": "An Agentic AI use case idea submitted by an employee for CoE evaluation.",
       "ownership": "UserOwned",
       "ownershipType": "UserOwned",
       "isActivity": false,
       "hasActivities": false,
       "hasNotes": true,
+      "oobLifecycle": {
+        "statecode": [
+          { "value": 0, "label": "Active" },
+          { "value": 1, "label": "Inactive" }
+        ],
+        "statuscode": [
+          { "value": 100000000, "label": "Draft", "state": 0 },
+          { "value": 100000001, "label": "Submitted", "state": 0 },
+          { "value": 100000002, "label": "Under Review", "state": 0 },
+          { "value": 100000003, "label": "Approved", "state": 1 },
+          { "value": 100000004, "label": "Rejected", "state": 1 },
+          { "value": 100000005, "label": "On Hold", "state": 0 },
+          { "value": 100000006, "label": "In Progress", "state": 0 },
+          { "value": 100000007, "label": "Completed", "state": 1 }
+        ]
+      },
       "primaryName": {
-        "schemaName": "yourprefix_ProjectRequestName",
-        "displayName": "Name",
-        "description": "Primary name for the request",
-        "maxLength": 100
+        "schemaName": "afp_Title",
+        "displayName": "Title",
+        "description": "Short title for the use case idea",
+        "maxLength": 200
       },
       "columns": [
         {
-          "schemaName": "yourprefix_requeststatus",
-          "displayName": "Request Status",
-          "logicalName": "yourprefix_requeststatus",
-          "type": "Picklist",
-          "globalOptionSetName": "yourprefix_requeststatus",
+          "schemaName": "afp_BusinessObjectives",
+          "displayName": "Business Objectives",
+          "logicalName": "afp_businessobjectives",
+          "type": "Memo",
           "requiredLevel": "ApplicationRequired"
         },
         {
-          "schemaName": "yourprefix_requestedon",
-          "displayName": "Requested On",
-          "logicalName": "yourprefix_requestedon",
-          "type": "DateTime",
-          "format": "DateOnly",
+          "schemaName": "afp_IntendedUserRoles",
+          "displayName": "Intended Users / Roles",
+          "logicalName": "afp_intendeduserroles",
+          "type": "Memo",
+          "requiredLevel": "ApplicationRequired"
+        },
+        {
+          "schemaName": "afp_DataSources",
+          "displayName": "Data Sources",
+          "logicalName": "afp_datasources",
+          "type": "Memo",
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_PhiRequired",
+          "displayName": "PHI Required",
+          "logicalName": "afp_phirequired",
+          "type": "Boolean",
+          "requiredLevel": "None",
+          "trueLabel": "Yes",
+          "falseLabel": "No",
+          "defaultValue": false
+        },
+        {
+          "schemaName": "afp_ExpectedOutcomes",
+          "displayName": "Expected Outcomes",
+          "logicalName": "afp_expectedoutcomes",
+          "type": "Memo",
+          "requiredLevel": "ApplicationRequired"
+        },
+        {
+          "schemaName": "afp_RiskFactors",
+          "displayName": "Risk Factors / Regulatory Impact",
+          "logicalName": "afp_riskfactors",
+          "type": "Memo",
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_Department",
+          "displayName": "Department",
+          "logicalName": "afp_department",
+          "type": "String",
+          "maxLength": 100,
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_EstimatedCostsImage",
+          "displayName": "Estimated Costs Image",
+          "logicalName": "afp_estimatedcostsimage",
+          "type": "Image",
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_MonthlyCopilotCreditsCost",
+          "displayName": "Monthly Copilot Credits Cost",
+          "logicalName": "afp_monthlycopilotcreditscost",
+          "type": "String",
+          "maxLength": 100,
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_MonthlyCopilotCreditsNotes",
+          "displayName": "Monthly Copilot Credits Notes",
+          "logicalName": "afp_monthlycopilotcreditsnotes",
+          "type": "Memo",
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_UserBasedLicensingCost",
+          "displayName": "User Based Licensing Cost",
+          "logicalName": "afp_userbasedlicensingcost",
+          "type": "String",
+          "maxLength": 100,
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_UserBasedLicensingNotes",
+          "displayName": "User Based Licensing Notes",
+          "logicalName": "afp_userbasedlicensingnotes",
+          "type": "Memo",
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_DataSourceCost",
+          "displayName": "Data Source Cost",
+          "logicalName": "afp_datasourcecost",
+          "type": "String",
+          "maxLength": 100,
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_DataSourceNotes",
+          "displayName": "Data Source Notes",
+          "logicalName": "afp_datasourcenotes",
+          "type": "Memo",
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_OverallCostNotesHtml",
+          "displayName": "Overall Cost Notes HTML",
+          "logicalName": "afp_overallcostnoteshtml",
+          "type": "Memo",
           "requiredLevel": "None"
         }
-      ],
-      "attributes": [
+      ]
+    },
+    {
+      "schemaName": "afp_ApprovalStageRecord",
+      "displayName": "Approval Stage Record",
+      "displayCollectionName": "Approval Stage Records",
+      "logicalSingularName": "afp_approvalstagerecord",
+      "logicalPluralName": "afp_approvalstagerecords",
+      "entitySetName": "afp_approvalstagerecords",
+      "tableLogicalName": "afp_approvalstagerecords",
+      "description": "Tracks each stage in the multi-step approval process for an idea submission.",
+      "ownership": "UserOwned",
+      "ownershipType": "UserOwned",
+      "isActivity": false,
+      "hasActivities": false,
+      "hasNotes": false,
+      "oobLifecycle": {
+        "statecode": [
+          { "value": 0, "label": "Active" },
+          { "value": 1, "label": "Inactive" }
+        ],
+        "statuscode": [
+          { "value": 100000000, "label": "Pending", "state": 0 },
+          { "value": 100000001, "label": "Approved", "state": 0 },
+          { "value": 100000002, "label": "Rejected", "state": 1 },
+          { "value": 100000003, "label": "On Hold", "state": 0 }
+        ]
+      },
+      "primaryName": {
+        "schemaName": "afp_StageRecordName",
+        "displayName": "Stage Record Name",
+        "description": "Auto-generated name for this approval stage record",
+        "maxLength": 200
+      },
+      "columns": [
         {
-          "schemaName": "yourprefix_requeststatus",
-          "displayName": "Request Status",
+          "schemaName": "afp_Stage",
+          "displayName": "Approval Stage",
+          "logicalName": "afp_stage",
           "type": "Picklist",
-          "globalOptionSetName": "yourprefix_requeststatus",
+          "globalOptionSetName": "afp_approvalstage",
+          "requiredLevel": "ApplicationRequired",
+          "options": [
+            { "value": 100000000, "label": "CoE Review" },
+            { "value": 100000001, "label": "IT Sign-off" },
+            { "value": 100000002, "label": "Executive Approval" }
+          ]
+        },
+        {
+          "schemaName": "afp_StageStatus",
+          "displayName": "Stage Status",
+          "logicalName": "afp_stagestatus",
+          "type": "Picklist",
+          "globalOptionSetName": "afp_approvalstagestatus",
+          "requiredLevel": "ApplicationRequired",
+          "options": [
+            { "value": 100000000, "label": "Pending" },
+            { "value": 100000001, "label": "Approved" },
+            { "value": 100000002, "label": "Rejected" },
+            { "value": 100000003, "label": "On Hold" }
+          ]
+        },
+        {
+          "schemaName": "afp_Comments",
+          "displayName": "Comments",
+          "logicalName": "afp_comments",
+          "type": "Memo",
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_ReviewedOn",
+          "displayName": "Reviewed On",
+          "logicalName": "afp_reviewedon",
+          "type": "DateTime",
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_ReviewedByName",
+          "displayName": "Reviewed By Name",
+          "logicalName": "afp_reviewedbyname",
+          "type": "String",
+          "maxLength": 200,
+          "requiredLevel": "None"
+        }
+      ]
+    },
+    {
+      "schemaName": "afp_LookupOption",
+      "displayName": "Lookup Option",
+      "displayCollectionName": "Lookup Options",
+      "logicalSingularName": "afp_lookupoption",
+      "logicalPluralName": "afp_lookupoptions",
+      "entitySetName": "afp_lookupoptions",
+      "tableLogicalName": "afp_lookupoptions",
+      "description": "Reusable lookup option records for structured intake and AI CoE roles.",
+      "ownership": "UserOwned",
+      "ownershipType": "UserOwned",
+      "isActivity": false,
+      "hasActivities": false,
+      "hasNotes": false,
+      "primaryName": {
+        "schemaName": "afp_Name",
+        "displayName": "Name",
+        "description": "Lookup option display name",
+        "maxLength": 200
+      },
+      "columns": [
+        {
+          "schemaName": "afp_Category",
+          "displayName": "Category",
+          "logicalName": "afp_category",
+          "type": "Picklist",
+          "globalOptionSetName": "afp_lookupoptioncategory",
+          "requiredLevel": "ApplicationRequired",
+          "options": [
+            { "value": 100000000, "label": "Business Objectives" },
+            { "value": 100000001, "label": "Intended User Roles" },
+            { "value": 100000002, "label": "Data Sources" },
+            { "value": 100000003, "label": "Expected Outcomes" },
+            { "value": 100000004, "label": "Risk Factors" },
+            { "value": 100000005, "label": "Departments" },
+            { "value": 100000006, "label": "AI CoE Roles" }
+          ]
+        },
+        {
+          "schemaName": "afp_Description",
+          "displayName": "Description",
+          "logicalName": "afp_description",
+          "type": "Memo",
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_IsActive",
+          "displayName": "Is Active",
+          "logicalName": "afp_isactive",
+          "type": "Boolean",
+          "requiredLevel": "None",
+          "trueLabel": "Yes",
+          "falseLabel": "No",
+          "defaultValue": true
+        }
+      ]
+    },
+    {
+      "schemaName": "afp_CoeStructuredReview",
+      "displayName": "CoE Structured Review",
+      "displayCollectionName": "CoE Structured Reviews",
+      "logicalSingularName": "afp_coestructuredreview",
+      "logicalPluralName": "afp_coestructuredreviews",
+      "entitySetName": "afp_coestructuredreviews",
+      "tableLogicalName": "afp_coestructuredreviews",
+      "description": "Stores the structured CoE intake for a submitted idea.",
+      "ownership": "UserOwned",
+      "ownershipType": "UserOwned",
+      "isActivity": false,
+      "hasActivities": false,
+      "hasNotes": false,
+      "primaryName": {
+        "schemaName": "afp_Name",
+        "displayName": "Name",
+        "description": "Auto-generated structured review name",
+        "maxLength": 200
+      },
+      "columns": [
+        {
+          "schemaName": "afp_UpdatedBy",
+          "displayName": "Updated By",
+          "logicalName": "afp_updatedby",
+          "type": "String",
+          "maxLength": 200,
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_UpdatedOn",
+          "displayName": "Updated On",
+          "logicalName": "afp_updatedon",
+          "type": "DateTime",
+          "requiredLevel": "None"
+        }
+      ]
+    },
+    {
+      "schemaName": "afp_CoeStructuredReviewSelection",
+      "displayName": "CoE Structured Review Selection",
+      "displayCollectionName": "CoE Structured Review Selections",
+      "logicalSingularName": "afp_coestructuredreviewselection",
+      "logicalPluralName": "afp_coestructuredreviewselections",
+      "entitySetName": "afp_coestructuredreviewselections",
+      "tableLogicalName": "afp_coestructuredreviewselections",
+      "description": "Stores a single selected lookup option for a structured review.",
+      "ownership": "UserOwned",
+      "ownershipType": "UserOwned",
+      "isActivity": false,
+      "hasActivities": false,
+      "hasNotes": false,
+      "primaryName": {
+        "schemaName": "afp_Name",
+        "displayName": "Name",
+        "description": "Auto-generated structured review selection name",
+        "maxLength": 200
+      },
+      "columns": [
+        {
+          "schemaName": "afp_OptionId",
+          "displayName": "Option ID",
+          "logicalName": "afp_optionid",
+          "type": "String",
+          "maxLength": 36,
+          "requiredLevel": "ApplicationRequired"
+        }
+      ]
+    },
+    {
+      "schemaName": "afp_AiCoeTeamMember",
+      "displayName": "AI CoE Team Member",
+      "displayCollectionName": "AI CoE Team Members",
+      "logicalSingularName": "afp_aicoeteammember",
+      "logicalPluralName": "afp_aicoeteammembers",
+      "entitySetName": "afp_aicoeteammembers",
+      "tableLogicalName": "afp_aicoeteammembers",
+      "description": "Records the AI CoE members available for approvals.",
+      "ownership": "UserOwned",
+      "ownershipType": "UserOwned",
+      "isActivity": false,
+      "hasActivities": false,
+      "hasNotes": false,
+      "primaryName": {
+        "schemaName": "afp_Name",
+        "displayName": "Name",
+        "description": "Auto-generated team member name",
+        "maxLength": 200
+      },
+      "columns": [
+        {
+          "schemaName": "afp_MemberId",
+          "displayName": "Member",
+          "logicalName": "afp_memberid",
+          "type": "Lookup",
+          "lookupTarget": "systemuser",
           "requiredLevel": "ApplicationRequired"
         },
         {
-          "schemaName": "yourprefix_requestedon",
-          "displayName": "Requested On",
+          "schemaName": "afp_RoleId",
+          "displayName": "CoE Role",
+          "logicalName": "afp_roleid",
+          "type": "Lookup",
+          "lookupTarget": "afp_aicoeroles",
+          "requiredLevel": "ApplicationRequired"
+        },
+        {
+          "schemaName": "afp_AddedOn",
+          "displayName": "Added On",
+          "logicalName": "afp_addedon",
           "type": "DateTime",
-          "format": "DateOnly",
           "requiredLevel": "None"
+        }
+      ]
+    },
+    {
+      "schemaName": "afp_AiCoeTeamApproval",
+      "displayName": "AI CoE Team Approval",
+      "displayCollectionName": "AI CoE Team Approvals",
+      "logicalSingularName": "afp_aicoeteamapproval",
+      "logicalPluralName": "afp_aicoeteamapprovals",
+      "entitySetName": "afp_aicoeteamapprovals",
+      "tableLogicalName": "afp_aicoeteamapprovals",
+      "description": "Tracks the current approval state for each AI CoE team member on a submission.",
+      "ownership": "UserOwned",
+      "ownershipType": "UserOwned",
+      "isActivity": false,
+      "hasActivities": false,
+      "hasNotes": false,
+      "oobLifecycle": {
+        "statecode": [
+          { "value": 0, "label": "Active" },
+          { "value": 1, "label": "Inactive" }
+        ],
+        "statuscode": [
+          { "value": 100000000, "label": "Pending", "state": 0 },
+          { "value": 100000001, "label": "Approved", "state": 0 },
+          { "value": 100000002, "label": "Denied", "state": 1 }
+        ]
+      },
+      "primaryName": {
+        "schemaName": "afp_Name",
+        "displayName": "Name",
+        "description": "Auto-generated approval name",
+        "maxLength": 200
+      },
+      "columns": [
+        {
+          "schemaName": "afp_TeamMemberId",
+          "displayName": "Team Member",
+          "logicalName": "afp_teammemberid",
+          "type": "String",
+          "maxLength": 36,
+          "requiredLevel": "ApplicationRequired"
+        },
+        {
+          "schemaName": "afp_Comment",
+          "displayName": "Comment",
+          "logicalName": "afp_comment",
+          "type": "Memo",
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_ReviewedByName",
+          "displayName": "Reviewed By Name",
+          "logicalName": "afp_reviewedbyname",
+          "type": "String",
+          "maxLength": 200,
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_ReviewedOn",
+          "displayName": "Reviewed On",
+          "logicalName": "afp_reviewedon",
+          "type": "DateTime",
+          "requiredLevel": "None"
+        }
+      ]
+    },
+    {
+      "schemaName": "afp_ApprovalHistoryEntry",
+      "displayName": "Approval History Entry",
+      "displayCollectionName": "Approval History Entries",
+      "logicalSingularName": "afp_approvalhistoryentry",
+      "logicalPluralName": "afp_approvalhistoryentries",
+      "entitySetName": "afp_approvalhistoryentries",
+      "tableLogicalName": "afp_approvalhistoryentries",
+      "description": "Immutable history log of approval and denial decisions.",
+      "ownership": "UserOwned",
+      "ownershipType": "UserOwned",
+      "isActivity": false,
+      "hasActivities": false,
+      "hasNotes": false,
+      "primaryName": {
+        "schemaName": "afp_Name",
+        "displayName": "Name",
+        "description": "Auto-generated history entry name",
+        "maxLength": 200
+      },
+      "columns": [
+        {
+          "schemaName": "afp_UserName",
+          "displayName": "User Name",
+          "logicalName": "afp_username",
+          "type": "String",
+          "maxLength": 200,
+          "requiredLevel": "ApplicationRequired"
+        },
+        {
+          "schemaName": "afp_RoleName",
+          "displayName": "Role Name",
+          "logicalName": "afp_rolename",
+          "type": "String",
+          "maxLength": 200,
+          "requiredLevel": "ApplicationRequired"
+        },
+        {
+          "schemaName": "afp_Decision",
+          "displayName": "Decision",
+          "logicalName": "afp_decision",
+          "type": "Picklist",
+          "globalOptionSetName": "afp_approvaldecision",
+          "requiredLevel": "ApplicationRequired",
+          "options": [
+            { "value": 100000000, "label": "Approved" },
+            { "value": 100000001, "label": "Denied" }
+          ]
+        },
+        {
+          "schemaName": "afp_Comments",
+          "displayName": "Comments",
+          "logicalName": "afp_comments",
+          "type": "Memo",
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_ReviewedOn",
+          "displayName": "Reviewed On",
+          "logicalName": "afp_reviewedon",
+          "type": "DateTime",
+          "requiredLevel": "ApplicationRequired"
         }
       ]
     }
@@ -65,13 +547,73 @@
   "relationships": [
     {
       "type": "ManyToOne",
-      "fromTable": "yourprefix_projectrequests",
-      "toTable": "yourprefix_departments",
-      "referencingEntity": "yourprefix_projectrequests",
-      "referencedEntity": "yourprefix_departments",
-      "schemaName": "yourprefix_ProjectRequest_Department",
-      "lookupSchemaName": "yourprefix_DepartmentId",
-      "lookupDisplayName": "Department"
+      "fromTable": "afp_approvalstagerecord",
+      "toTable": "afp_idearequirement",
+      "referencingEntity": "afp_approvalstagerecord",
+      "referencedEntity": "afp_idearequirement",
+      "schemaName": "afp_ApprovalStageRecord_IdeaRequirement",
+      "lookupSchemaName": "afp_SubmissionId",
+      "lookupDisplayName": "Submission"
+    },
+    {
+      "type": "ManyToOne",
+      "fromTable": "afp_coestructuredreview",
+      "toTable": "afp_idearequirement",
+      "referencingEntity": "afp_coestructuredreview",
+      "referencedEntity": "afp_idearequirement",
+      "schemaName": "afp_CoeStructuredReview_IdeaRequirement",
+      "lookupSchemaName": "afp_SubmissionId",
+      "lookupDisplayName": "Submission"
+    },
+    {
+      "type": "ManyToOne",
+      "fromTable": "afp_coestructuredreviewselection",
+      "toTable": "afp_coestructuredreview",
+      "referencingEntity": "afp_coestructuredreviewselection",
+      "referencedEntity": "afp_coestructuredreview",
+      "schemaName": "afp_CoeStructuredReviewSelection_CoeStructuredReview",
+      "lookupSchemaName": "afp_ReviewId",
+      "lookupDisplayName": "Review"
+    },
+    {
+      "type": "ManyToOne",
+      "fromTable": "afp_aicoeteammember",
+      "toTable": "systemuser",
+      "referencingEntity": "afp_aicoeteammember",
+      "referencedEntity": "systemuser",
+      "schemaName": "afp_AiCoeTeamMember_SystemUser",
+      "lookupSchemaName": "afp_MemberId",
+      "lookupDisplayName": "Member"
+    },
+    {
+      "type": "ManyToOne",
+      "fromTable": "afp_aicoeteammember",
+      "toTable": "afp_aicoerole",
+      "referencingEntity": "afp_aicoeteammember",
+      "referencedEntity": "afp_aicoerole",
+      "schemaName": "afp_AiCoeTeamMember_AiCoeRole",
+      "lookupSchemaName": "afp_RoleId",
+      "lookupDisplayName": "CoE Role"
+    },
+    {
+      "type": "ManyToOne",
+      "fromTable": "afp_aicoeteamapproval",
+      "toTable": "afp_idearequirement",
+      "referencingEntity": "afp_aicoeteamapproval",
+      "referencedEntity": "afp_idearequirement",
+      "schemaName": "afp_AiCoeTeamApproval_IdeaRequirement",
+      "lookupSchemaName": "afp_SubmissionId",
+      "lookupDisplayName": "Submission"
+    },
+    {
+      "type": "ManyToOne",
+      "fromTable": "afp_approvalhistoryentry",
+      "toTable": "afp_idearequirement",
+      "referencingEntity": "afp_approvalhistoryentry",
+      "referencedEntity": "afp_idearequirement",
+      "schemaName": "afp_ApprovalHistoryEntry_IdeaRequirement",
+      "lookupSchemaName": "afp_SubmissionId",
+      "lookupDisplayName": "Submission"
     }
   ],
   "provisioningPlansJson": [

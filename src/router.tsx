@@ -1,24 +1,43 @@
-import { createBrowserRouter } from "react-router-dom"
+import { createHashRouter } from "react-router-dom"
+import { Navigate } from "react-router-dom"
 import Layout from "@/pages/_layout"
-import HomePage from "@/pages/home"
+import DashboardPage from "@/pages/dashboard"
+import SubmitIdeaPage from "@/pages/submit-idea"
+import MySubmissionsPage from "@/pages/my-submissions"
+import SubmissionDetailPage from "@/pages/submission-detail"
+import LookupTablesPage from "@/pages/lookup-tables"
+import CoeRolesPage from "@/pages/coe-roles"
+import AiCoeTeamPage from "@/pages/ai-coe-team"
 import NotFoundPage from "@/pages/not-found"
 
 // IMPORTANT: Do not remove or modify the code below!
-// Normalize basename when hosted in Power Apps
-const BASENAME = new URL(".", location.href).pathname
+// Normalize the URL when hosted in Power Apps. The Power Apps host serves the
+// app from a deep storage-proxy path and may append `/index.html`; strip it so
+// the address bar stays clean. We deliberately do NOT feed this pathname into
+// the router as a basename: this app uses createHashRouter, whose routing lives
+// entirely in the URL fragment (e.g. `#/dashboard`). The fragment is always
+// rooted at "/", so a pathname-derived basename would never match and the
+// router would render nothing (blank screen). See issue: HashRouter basename.
+const HOST_PATHNAME = new URL(".", location.href).pathname
 if (location.pathname.endsWith("/index.html")) {
-  history.replaceState(null, "", BASENAME + location.search + location.hash);
+  history.replaceState(null, "", HOST_PATHNAME + location.search + location.hash);
 }
 
-export const router = createBrowserRouter([
+export const router = createHashRouter([
   {
     path: "/",
-    element: <Layout showHeader={false} />,
+    element: <Layout />,
     errorElement: <NotFoundPage />,
     children: [
-      { index: true, element: <HomePage /> },
+      { index: true, element: <Navigate to="/dashboard" replace /> },
+      { path: "dashboard", element: <DashboardPage /> },
+      { path: "submit", element: <SubmitIdeaPage /> },
+      { path: "submit/:id", element: <SubmitIdeaPage /> },
+      { path: "my-ideas", element: <MySubmissionsPage /> },
+      { path: "lookup-tables", element: <LookupTablesPage /> },
+      { path: "coe-roles", element: <CoeRolesPage /> },
+      { path: "ai-coe-team", element: <AiCoeTeamPage /> },
+      { path: "submissions/:id", element: <SubmissionDetailPage /> },
     ],
   },
-], { 
-  basename: BASENAME // IMPORTANT: Set basename for proper routing when hosted in Power Apps
-})
+])

@@ -118,6 +118,45 @@
   --sidebar-ring: oklch(0.556 0 0);
 }
 
+/*
+ * Mount Sinai brand theme.
+ * Derived from mountsinai.org — a vivid "Mount Sinai magenta" primary
+ * (~#D6006E) on a clean white canvas with a deep-plum branded sidebar.
+ */
+.mount-sinai {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.22 0.03 330);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.22 0.03 330);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.22 0.03 330);
+  --primary: oklch(0.56 0.23 352);
+  --primary-foreground: oklch(0.99 0.01 350);
+  --secondary: oklch(0.95 0.02 340);
+  --secondary-foreground: oklch(0.3 0.06 340);
+  --muted: oklch(0.96 0.012 340);
+  --muted-foreground: oklch(0.5 0.04 340);
+  --accent: oklch(0.93 0.06 345);
+  --accent-foreground: oklch(0.32 0.12 348);
+  --destructive: oklch(0.58 0.22 27.3);
+  --border: oklch(0.9 0.02 340);
+  --input: oklch(0.9 0.02 340);
+  --ring: oklch(0.56 0.23 352);
+  --chart-1: oklch(0.56 0.23 352);
+  --chart-2: oklch(0.65 0.15 200);
+  --chart-3: oklch(0.5 0.12 265);
+  --chart-4: oklch(0.72 0.17 60);
+  --chart-5: oklch(0.62 0.2 25);
+  --sidebar: oklch(0.26 0.07 332);
+  --sidebar-foreground: oklch(0.97 0.01 340);
+  --sidebar-primary: oklch(0.56 0.23 352);
+  --sidebar-primary-foreground: oklch(0.99 0.01 350);
+  --sidebar-accent: oklch(0.33 0.08 334);
+  --sidebar-accent-foreground: oklch(0.97 0.01 340);
+  --sidebar-border: oklch(0.4 0.07 334);
+  --sidebar-ring: oklch(0.56 0.23 352);
+}
+
 @layer base {
   html, body, #root { 
     height: 100%; 

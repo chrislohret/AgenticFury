@@ -1,0 +1,428 @@
+{
+  "generatedAt": "2026-06-03T20:22:51.593Z",
+  "sourcePlan": "dataverse\\planning-payload.json",
+  "description": "Structured provisioning plan for the Dataverse-skills plugin (dv-metadata). Feed this to the agent: \"Provision the schema described in dataverse/provision-plugin.plan.json\".",
+  "sequence": [
+    {
+      "phase": 1,
+      "action": "Create global option sets",
+      "items": [
+        {
+          "name": "afp_approvalstage",
+          "referencedBy": [
+            {
+              "table": "afp_approvalstagerecords",
+              "column": "afp_stage"
+            }
+          ]
+        },
+        {
+          "name": "afp_approvalstagestatus",
+          "referencedBy": [
+            {
+              "table": "afp_approvalstagerecords",
+              "column": "afp_stagestatus"
+            }
+          ]
+        },
+        {
+          "name": "afp_lookupoptioncategory",
+          "referencedBy": [
+            {
+              "table": "afp_lookupoptions",
+              "column": "afp_category"
+            }
+          ]
+        },
+        {
+          "name": "afp_approvaldecision",
+          "referencedBy": [
+            {
+              "table": "afp_approvalhistoryentries",
+              "column": "afp_decision"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "phase": 2,
+      "action": "Create tables with primary name columns",
+      "items": [
+        {
+          "schemaName": "afp_IdeaRequirement",
+          "displayName": "Idea Requirement",
+          "logicalName": "afp_idearequirement",
+          "ownership": "UserOwned",
+          "primaryName": {
+            "schemaName": "afp_Title",
+            "displayName": "Title",
+            "description": "Short title for the use case idea",
+            "maxLength": 200
+          }
+        },
+        {
+          "schemaName": "afp_ApprovalStageRecord",
+          "displayName": "Approval Stage Record",
+          "logicalName": "afp_approvalstagerecord",
+          "ownership": "UserOwned",
+          "primaryName": {
+            "schemaName": "afp_StageRecordName",
+            "displayName": "Stage Record Name",
+            "description": "Auto-generated name for this approval stage record",
+            "maxLength": 200
+          }
+        },
+        {
+          "schemaName": "afp_LookupOption",
+          "displayName": "Lookup Option",
+          "logicalName": "afp_lookupoption",
+          "ownership": "UserOwned",
+          "primaryName": {
+            "schemaName": "afp_Name",
+            "displayName": "Name",
+            "description": "Lookup option display name",
+            "maxLength": 200
+          }
+        },
+        {
+          "schemaName": "afp_CoeStructuredReview",
+          "displayName": "CoE Structured Review",
+          "logicalName": "afp_coestructuredreview",
+          "ownership": "UserOwned",
+          "primaryName": {
+            "schemaName": "afp_Name",
+            "displayName": "Name",
+            "description": "Auto-generated structured review name",
+            "maxLength": 200
+          }
+        },
+        {
+          "schemaName": "afp_CoeStructuredReviewSelection",
+          "displayName": "CoE Structured Review Selection",
+          "logicalName": "afp_coestructuredreviewselection",
+          "ownership": "UserOwned",
+          "primaryName": {
+            "schemaName": "afp_Name",
+            "displayName": "Name",
+            "description": "Auto-generated structured review selection name",
+            "maxLength": 200
+          }
+        },
+        {
+          "schemaName": "afp_AiCoeTeamMember",
+          "displayName": "AI CoE Team Member",
+          "logicalName": "afp_aicoeteammember",
+          "ownership": "UserOwned",
+          "primaryName": {
+            "schemaName": "afp_Name",
+            "displayName": "Name",
+            "description": "Auto-generated team member name",
+            "maxLength": 200
+          }
+        },
+        {
+          "schemaName": "afp_AiCoeTeamApproval",
+          "displayName": "AI CoE Team Approval",
+          "logicalName": "afp_aicoeteamapproval",
+          "ownership": "UserOwned",
+          "primaryName": {
+            "schemaName": "afp_Name",
+            "displayName": "Name",
+            "description": "Auto-generated approval name",
+            "maxLength": 200
+          }
+        },
+        {
+          "schemaName": "afp_ApprovalHistoryEntry",
+          "displayName": "Approval History Entry",
+          "logicalName": "afp_approvalhistoryentry",
+          "ownership": "UserOwned",
+          "primaryName": {
+            "schemaName": "afp_Name",
+            "displayName": "Name",
+            "description": "Auto-generated history entry name",
+            "maxLength": 200
+          }
+        }
+      ]
+    },
+    {
+      "phase": 3,
+      "action": "Add columns to tables",
+      "items": [
+        {
+          "table": "afp_idearequirement",
+          "column": "afp_BusinessObjectives",
+          "type": "Memo"
+        },
+        {
+          "table": "afp_idearequirement",
+          "column": "afp_IntendedUserRoles",
+          "type": "Memo"
+        },
+        {
+          "table": "afp_idearequirement",
+          "column": "afp_DataSources",
+          "type": "Memo"
+        },
+        {
+          "table": "afp_idearequirement",
+          "column": "afp_PhiRequired",
+          "type": "Boolean"
+        },
+        {
+          "table": "afp_idearequirement",
+          "column": "afp_ExpectedOutcomes",
+          "type": "Memo"
+        },
+        {
+          "table": "afp_idearequirement",
+          "column": "afp_RiskFactors",
+          "type": "Memo"
+        },
+        {
+          "table": "afp_idearequirement",
+          "column": "afp_Department",
+          "type": "String"
+        },
+        {
+          "table": "afp_idearequirement",
+          "column": "afp_EstimatedCostsImage",
+          "type": "Image"
+        },
+        {
+          "table": "afp_idearequirement",
+          "column": "afp_MonthlyCopilotCreditsCost",
+          "type": "String"
+        },
+        {
+          "table": "afp_idearequirement",
+          "column": "afp_MonthlyCopilotCreditsNotes",
+          "type": "Memo"
+        },
+        {
+          "table": "afp_idearequirement",
+          "column": "afp_UserBasedLicensingCost",
+          "type": "String"
+        },
+        {
+          "table": "afp_idearequirement",
+          "column": "afp_UserBasedLicensingNotes",
+          "type": "Memo"
+        },
+        {
+          "table": "afp_idearequirement",
+          "column": "afp_DataSourceCost",
+          "type": "String"
+        },
+        {
+          "table": "afp_idearequirement",
+          "column": "afp_DataSourceNotes",
+          "type": "Memo"
+        },
+        {
+          "table": "afp_idearequirement",
+          "column": "afp_OverallCostNotesHtml",
+          "type": "Memo"
+        },
+        {
+          "table": "afp_approvalstagerecord",
+          "column": "afp_Stage",
+          "type": "Picklist",
+          "globalOptionSetName": "afp_approvalstage"
+        },
+        {
+          "table": "afp_approvalstagerecord",
+          "column": "afp_StageStatus",
+          "type": "Picklist",
+          "globalOptionSetName": "afp_approvalstagestatus"
+        },
+        {
+          "table": "afp_approvalstagerecord",
+          "column": "afp_Comments",
+          "type": "Memo"
+        },
+        {
+          "table": "afp_approvalstagerecord",
+          "column": "afp_ReviewedOn",
+          "type": "DateTime"
+        },
+        {
+          "table": "afp_approvalstagerecord",
+          "column": "afp_ReviewedByName",
+          "type": "String"
+        },
+        {
+          "table": "afp_lookupoption",
+          "column": "afp_Category",
+          "type": "Picklist",
+          "globalOptionSetName": "afp_lookupoptioncategory"
+        },
+        {
+          "table": "afp_lookupoption",
+          "column": "afp_Description",
+          "type": "Memo"
+        },
+        {
+          "table": "afp_lookupoption",
+          "column": "afp_IsActive",
+          "type": "Boolean"
+        },
+        {
+          "table": "afp_coestructuredreview",
+          "column": "afp_UpdatedBy",
+          "type": "String"
+        },
+        {
+          "table": "afp_coestructuredreview",
+          "column": "afp_UpdatedOn",
+          "type": "DateTime"
+        },
+        {
+          "table": "afp_aicoeteammember",
+          "column": "afp_UserId",
+          "type": "String"
+        },
+        {
+          "table": "afp_aicoeteammember",
+          "column": "afp_UserName",
+          "type": "String"
+        },
+        {
+          "table": "afp_aicoeteammember",
+          "column": "afp_UserEmail",
+          "type": "String"
+        },
+        {
+          "table": "afp_aicoeteammember",
+          "column": "afp_RoleId",
+          "type": "Lookup"
+        },
+        {
+          "table": "afp_aicoeteammember",
+          "column": "afp_AddedOn",
+          "type": "DateTime"
+        },
+        {
+          "table": "afp_aicoeteamapproval",
+          "column": "afp_TeamMemberId",
+          "type": "Lookup"
+        },
+        {
+          "table": "afp_aicoeteamapproval",
+          "column": "afp_Comment",
+          "type": "Memo"
+        },
+        {
+          "table": "afp_aicoeteamapproval",
+          "column": "afp_ReviewedByName",
+          "type": "String"
+        },
+        {
+          "table": "afp_aicoeteamapproval",
+          "column": "afp_ReviewedOn",
+          "type": "DateTime"
+        },
+        {
+          "table": "afp_approvalhistoryentry",
+          "column": "afp_UserName",
+          "type": "String"
+        },
+        {
+          "table": "afp_approvalhistoryentry",
+          "column": "afp_RoleName",
+          "type": "String"
+        },
+        {
+          "table": "afp_approvalhistoryentry",
+          "column": "afp_Decision",
+          "type": "Picklist",
+          "globalOptionSetName": "afp_approvaldecision"
+        },
+        {
+          "table": "afp_approvalhistoryentry",
+          "column": "afp_Comments",
+          "type": "Memo"
+        },
+        {
+          "table": "afp_approvalhistoryentry",
+          "column": "afp_ReviewedOn",
+          "type": "DateTime"
+        }
+      ]
+    },
+    {
+      "phase": 4,
+      "action": "Create relationships",
+      "items": [
+        {
+          "type": "ManyToOne",
+          "from": "afp_approvalstagerecord",
+          "to": "afp_idearequirement",
+          "schemaName": "afp_ApprovalStageRecord_IdeaRequirement"
+        },
+        {
+          "type": "ManyToOne",
+          "from": "afp_coestructuredreview",
+          "to": "afp_idearequirement",
+          "schemaName": "afp_CoeStructuredReview_IdeaRequirement"
+        },
+        {
+          "type": "ManyToOne",
+          "from": "afp_coestructuredreviewselection",
+          "to": "afp_coestructuredreview",
+          "schemaName": "afp_CoeStructuredReviewSelection_CoeStructuredReview"
+        },
+        {
+          "type": "ManyToOne",
+          "from": "afp_coestructuredreviewselection",
+          "to": "afp_lookupoption",
+          "schemaName": "afp_CoeStructuredReviewSelection_LookupOption"
+        },
+        {
+          "type": "ManyToOne",
+          "from": "afp_aicoeteammember",
+          "to": "afp_lookupoption",
+          "schemaName": "afp_AiCoeTeamMember_LookupOption"
+        },
+        {
+          "type": "ManyToOne",
+          "from": "afp_aicoeteamapproval",
+          "to": "afp_idearequirement",
+          "schemaName": "afp_AiCoeTeamApproval_IdeaRequirement"
+        },
+        {
+          "type": "ManyToOne",
+          "from": "afp_aicoeteamapproval",
+          "to": "afp_aicoeteammember",
+          "schemaName": "afp_AiCoeTeamApproval_AiCoeTeamMember"
+        },
+        {
+          "type": "ManyToOne",
+          "from": "afp_approvalhistoryentry",
+          "to": "afp_idearequirement",
+          "schemaName": "afp_ApprovalHistoryEntry_IdeaRequirement"
+        }
+      ]
+    },
+    {
+      "phase": 5,
+      "action": "PublishAllXml"
+    },
+    {
+      "phase": 6,
+      "action": "Register data sources (pac code add-data-source)",
+      "tables": [
+        "afp_idearequirements",
+        "afp_approvalstagerecords",
+        "afp_lookupoptions",
+        "afp_coestructuredreviews",
+        "afp_coestructuredreviewselections",
+        "afp_aicoeteammembers",
+        "afp_aicoeteamapprovals",
+        "afp_approvalhistoryentries"
+      ]
+    }
+  ]
+}
