@@ -20,6 +20,9 @@ export interface IdeaSubmission {
   riskFactors?: string;
   // Prototype: data URL string. Real Dataverse mapping should target an image/file column.
   estimatedCostsImageUrl?: string;
+  // Copilot Studio Estimator PDF, stored in the afp_copilotcreditestimatorpdf File column.
+  copilotCreditEstimatorPdfUrl?: string;
+  copilotCreditEstimatorPdfName?: string;
   monthlyCopilotCreditsCost?: number;
   monthlyCopilotCreditsNotes?: string;
   userBasedLicensingCost?: number;
@@ -27,6 +30,7 @@ export interface IdeaSubmission {
   dataSourceCost?: number;
   dataSourceNotes?: string;
   overallCostNotesHtml?: string;
+  aiPlatformSelection?: number;
   status: number;
   department?: string;
   submittedBy?: string;

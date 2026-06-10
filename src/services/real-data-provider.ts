@@ -1,5 +1,7 @@
 import { getContext } from '@microsoft/power-apps/app';
 import type { IOperationResult } from '@microsoft/power-apps/data';
+import { getClient } from '@microsoft/power-apps/data';
+import { dataSourcesInfo } from '../../.power/schemas/appschemas/dataSourcesInfo';
 import { MicrosoftDataverseService } from '@/generated/services/MicrosoftDataverseService';
 import { IDEA_STATUS } from '@/constants/ideaStatus';
 import { getFieldMetadata } from '@/services/field-metadata-cache';
@@ -39,6 +41,18 @@ const TABLES = {
   notes: 'annotations',
   systemUser: 'systemusers',
 } as const;
+
+// Dataverse File-column SDK APIs key off the table's ENTITY SET (plural) name,
+// matching the entitySetName the runtime registers in its database references and
+// the entity-set segment of the Web API URL. Reuse the same name as every other
+// idea operation.
+const IDEA_FILE_TABLE = TABLES.idea;
+
+// Dedicated data client for binary File-column operations. The connector action
+// (UpdateEntityFileImageFieldContent) does not reliably persist File columns
+// from a Code App; the SDK's uploadFileToRecord/downloadFileFromRecord helpers
+// stream raw binary to the proper Web API file endpoint and are the supported path.
+const dataClient = getClient(dataSourcesInfo);
 
 const IDEA_STATUS_VALUES: Record<number, number> = {
   [IDEA_STATUS.DRAFT]: 100000000,
@@ -297,6 +311,59 @@ async function clearImage(entityName: string, id: string, fieldName: string): Pr
   await upsertRow(entityName, id, { [fieldName]: null });
 }
 
+function base64ToBytes(base64: string): Uint8Array {
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i += 1) {
+    bytes[i] = binary.charCodeAt(i);
+  }
+  return bytes;
+}
+
+function bytesToBase64(bytes: Uint8Array): string {
+  let binary = '';
+  const chunkSize = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunkSize) {
+    binary += String.fromCharCode(...bytes.subarray(i, i + chunkSize));
+  }
+  return btoa(binary);
+}
+
+// Upload a PDF (or any binary file) to a Dataverse File column. File columns are
+// NOT settable as base64 on a plain PATCH (that only works for Image columns) and
+// the connector action does not reliably persist them from a Code App. The SDK's
+// uploadFileToRecord streams the raw binary to the Web API file endpoint. NOTE:
+// the SDK file APIs take the ENTITY SET (plural) name (e.g. afp_idearequirements)
+// — the runtime keys its database references by entitySetName and injects the
+// name straight into the Web API URL path (api/data/v9.0/<tableName>), so the
+// singular logical name resolves to DataSourceNotFound / a 404.
+async function uploadFile(
+  entitySetName: string,
+  id: string,
+  fieldName: string,
+  dataUrl: string,
+  fileName: string,
+): Promise<void> {
+  const match = /^data:[^;]+;base64,(.+)$/.exec(dataUrl);
+  const base64 = match?.[1] ?? dataUrl;
+  const bytes = base64ToBytes(base64);
+  const result = await dataClient.uploadFileToRecord(entitySetName, id, fieldName, fileName, bytes);
+  requireSuccess(result, `Upload file ${fieldName}`);
+}
+
+async function clearFile(entitySetName: string, id: string, fieldName: string): Promise<void> {
+  const result = await dataClient.deleteFileOrImageFromRecord(entitySetName, id, fieldName);
+  requireSuccess(result, `Clear file ${fieldName}`);
+}
+
+async function downloadFile(entitySetName: string, id: string, fieldName: string, contentType = 'application/pdf'): Promise<string | undefined> {
+  const result = await dataClient.downloadFileFromRecord(entitySetName, id, fieldName);
+  if (!result.success || !result.data || result.data.length === 0) {
+    return undefined;
+  }
+  return `data:${contentType};base64,${bytesToBase64(result.data)}`;
+}
+
 async function downloadImage(entityName: string, id: string, fieldName: string): Promise<string | undefined> {
   const result = await MicrosoftDataverseService.GetEntityFileImageFieldContentWithOrganization(
     'bytes=0-',
@@ -320,6 +387,16 @@ async function resolveIdeaImageUrl(id: string, record: DataverseRecord): Promise
   const inline = toImageDataUrl(normalizeText(record.afp_estimatedcostsimage) || undefined);
   if (inline) return inline;
   return downloadImage(TABLES.idea, id, 'afp_estimatedcostsimage').catch(() => undefined);
+}
+
+// Resolve the Copilot Studio Estimator PDF for an idea record. File columns do
+// not return their bytes inline on the row, so the presence of a stored file is
+// signalled by the `_name` companion attribute. Only stream the content when a
+// file name is present, to avoid a needless (and failing) download otherwise.
+async function resolveIdeaPdfUrl(id: string, record: DataverseRecord): Promise<string | undefined> {
+  const hasFile = Boolean(normalizeText(record.afp_copilotcreditestimatorpdf_name));
+  if (!hasFile) return undefined;
+  return downloadFile(IDEA_FILE_TABLE, id, 'afp_copilotcreditestimatorpdf').catch(() => undefined);
 }
 
 function getRecordGuid(record: DataverseRecord): string {
@@ -368,7 +445,7 @@ function mapDecision(value: unknown): CoeApprovalHistoryEntry['decision'] {
   return DECISION_BY_VALUE[numeric] ?? 'approved';
 }
 
-function mapIdeaSubmission(record: DataverseRecord, imageUrl?: string): IdeaSubmission {
+function mapIdeaSubmission(record: DataverseRecord, imageUrl?: string, pdfUrl?: string): IdeaSubmission {
   const safeRecord = record ?? ({} as DataverseRecord);
   const createdBy = safeRecord.createdby as { systemuserid?: string; id?: string } | undefined;
   return {
@@ -381,6 +458,8 @@ function mapIdeaSubmission(record: DataverseRecord, imageUrl?: string): IdeaSubm
     expectedOutcomes: normalizeText(safeRecord.afp_expectedoutcomes),
     riskFactors: normalizeText(safeRecord.afp_riskfactors) || undefined,
     estimatedCostsImageUrl: imageUrl,
+    copilotCreditEstimatorPdfUrl: pdfUrl,
+    copilotCreditEstimatorPdfName: normalizeText(safeRecord.afp_copilotcreditestimatorpdf_name) || undefined,
     monthlyCopilotCreditsCost: normalizeNumber(safeRecord.afp_monthlycopilotcreditscost),
     monthlyCopilotCreditsNotes: normalizeText(safeRecord.afp_monthlycopilotcreditsnotes) || undefined,
     userBasedLicensingCost: normalizeNumber(safeRecord.afp_userbasedlicensingcost),
@@ -388,6 +467,7 @@ function mapIdeaSubmission(record: DataverseRecord, imageUrl?: string): IdeaSubm
     dataSourceCost: normalizeNumber(safeRecord.afp_datasourcecost),
     dataSourceNotes: normalizeText(safeRecord.afp_datasourcenotes) || undefined,
     overallCostNotesHtml: normalizeText(safeRecord.afp_overallcostnoteshtml) || undefined,
+    aiPlatformSelection: normalizeNumber(safeRecord.afp_aiplatformselection),
     status: mapIdeaStatus(safeRecord.statuscode),
     department: normalizeText(safeRecord.afp_department) || undefined,
     submittedBy: normalizeId(createdBy?.systemuserid ?? createdBy?.id ?? safeRecord._createdby_value ?? safeRecord.createdby_value) || undefined,
@@ -520,6 +600,7 @@ async function listIdeaRecords(): Promise<DataverseRecord[]> {
       'afp_datasourcecost',
       'afp_datasourcenotes',
       'afp_overallcostnoteshtml',
+      'afp_aiplatformselection',
       'statuscode',
       'createdon',
       'createdby',
@@ -544,6 +625,7 @@ async function getIdeaRecordById(id: string): Promise<DataverseRecord | null> {
       'afp_riskfactors',
       'afp_department',
       'afp_estimatedcostsimage',
+      'afp_copilotcreditestimatorpdf_name',
       'afp_monthlycopilotcreditscost',
       'afp_monthlycopilotcreditsnotes',
       'afp_userbasedlicensingcost',
@@ -551,6 +633,7 @@ async function getIdeaRecordById(id: string): Promise<DataverseRecord | null> {
       'afp_datasourcecost',
       'afp_datasourcenotes',
       'afp_overallcostnoteshtml',
+      'afp_aiplatformselection',
       'statuscode',
       'createdon',
       'createdby',
@@ -564,7 +647,8 @@ async function buildIdeaFromDataverse(id: string): Promise<IdeaSubmission | null
   const record = await getIdeaRecordById(id);
   if (!record) return null;
   const imageUrl = await resolveIdeaImageUrl(id, record);
-  return mapIdeaSubmission(record, imageUrl);
+  const pdfUrl = await resolveIdeaPdfUrl(id, record);
+  return mapIdeaSubmission(record, imageUrl, pdfUrl);
 }
 
 async function getLookupOptionRows(): Promise<LookupOption[]> {
@@ -660,6 +744,7 @@ export function createRealDataProvider(): AppDataProvider {
           afp_datasourcecost: input.dataSourceCost ?? existing?.dataSourceCost ?? null,
           afp_datasourcenotes: input.dataSourceNotes ?? existing?.dataSourceNotes ?? '',
           afp_overallcostnoteshtml: input.overallCostNotesHtml ?? existing?.overallCostNotesHtml ?? '',
+          afp_aiplatformselection: input.aiPlatformSelection ?? existing?.aiPlatformSelection ?? null,
           statuscode: input.status ?? existing?.status ?? IDEA_STATUS.DRAFT,
         };
 
@@ -673,7 +758,22 @@ export function createRealDataProvider(): AppDataProvider {
           }
         }
 
+        if (input.copilotCreditEstimatorPdfUrl !== undefined) {
+          if (input.copilotCreditEstimatorPdfUrl) {
+            await uploadFile(
+              IDEA_FILE_TABLE,
+              id,
+              'afp_copilotcreditestimatorpdf',
+              input.copilotCreditEstimatorPdfUrl,
+              input.copilotCreditEstimatorPdfName || 'copilot-credit-estimate.pdf',
+            );
+          } else {
+            await clearFile(IDEA_FILE_TABLE, id, 'afp_copilotcreditestimatorpdf');
+          }
+        }
+
         const imageUrl = input.estimatedCostsImageUrl ?? existing?.estimatedCostsImageUrl;
+        const pdfUrl = input.copilotCreditEstimatorPdfUrl ?? existing?.copilotCreditEstimatorPdfUrl;
         const submittedBy = existing?.submittedBy ?? (await getCurrentUserContext())?.id;
 
         // Dataverse PATCH returns 204 No Content (the Prefer header is empty), so
@@ -691,7 +791,7 @@ export function createRealDataProvider(): AppDataProvider {
           persisted = null;
         }
         return {
-          ...mapIdeaSubmission(persisted ?? body, imageUrl),
+          ...mapIdeaSubmission(persisted ?? body, imageUrl, pdfUrl),
           id,
           submittedBy,
         };
