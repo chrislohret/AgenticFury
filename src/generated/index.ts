@@ -11,6 +11,7 @@ export * as Afp_approvalstagerecordsModel from './models/Afp_approvalstagerecord
 export * as Afp_coestructuredreviewsModel from './models/Afp_coestructuredreviewsModel';
 export * as Afp_coestructuredreviewselectionsModel from './models/Afp_coestructuredreviewselectionsModel';
 export * as Afp_idearequirementsModel from './models/Afp_idearequirementsModel';
+export * as Afp_ideascorecardsModel from './models/Afp_ideascorecardsModel';
 export * as Afp_lookupoptionsModel from './models/Afp_lookupoptionsModel';
 export * as CommonModels from './models/CommonModels';
 export * as MicrosoftCopilotStudioModel from './models/MicrosoftCopilotStudioModel';
@@ -24,6 +25,7 @@ export * from './services/Afp_approvalstagerecordsService';
 export * from './services/Afp_coestructuredreviewsService';
 export * from './services/Afp_coestructuredreviewselectionsService';
 export * from './services/Afp_idearequirementsService';
+export * from './services/Afp_ideascorecardsService';
 export * from './services/Afp_lookupoptionsService';
 export * from './services/MicrosoftCopilotStudioService';
 export * from './services/MicrosoftDataverseService';

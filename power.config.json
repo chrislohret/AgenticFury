@@ -63,6 +63,10 @@
         "approvalhistoryentries": {
           "entitySetName": "afp_approvalhistoryentries",
           "logicalName": "afp_approvalhistoryentry"
+        },
+        "ideascorecards": {
+          "entitySetName": "afp_ideascorecards",
+          "logicalName": "afp_ideascorecard"
         }
       },
       "environmentVariableName": ""

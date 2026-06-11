@@ -4,6 +4,7 @@ import type {
   ApprovalStageRepository,
   LookupOptionRepository,
   CoeStructuredReviewRepository,
+  IdeaScorecardRepository,
   CoeNoteRepository,
   CoeApprovalHistoryRepository,
   DirectoryUserRepository,
@@ -18,6 +19,7 @@ import type {
   LookupOption,
   LookupCategory,
   CoeStructuredReview,
+  IdeaScorecard,
   CoeNote,
   CoeApprovalHistoryEntry,
   DirectoryUser,
@@ -29,11 +31,13 @@ import { mockIdeaSubmissions } from '@/mockData/ideaSubmission';
 import { mockApprovalStageRecords } from '@/mockData/approvalStageRecord';
 import { mockLookupOptions } from '@/mockData/lookupOption';
 import { mockCoeStructuredReviews } from '@/mockData/coeStructuredReview';
+import { mockIdeaScorecards } from '@/mockData/ideaScorecard';
 import { mockCoeNotes } from '@/mockData/coeNote';
 import { mockCoeApprovalHistory } from '@/mockData/coeApprovalHistory';
 import { mockDirectoryUsers } from '@/mockData/directoryUsers';
 import { mockAiCoeTeamMembers } from '@/mockData/aiCoeTeamMember';
 import { mockAiCoeTeamApprovals } from '@/mockData/aiCoeTeamApproval';
+import { computeWeightedTotal } from '@/lib/scorecard';
 
 function cloneRecord<T>(record: T): T {
   return JSON.parse(JSON.stringify(record)) as T;
@@ -182,6 +186,61 @@ function createCoeStructuredReviewRepository(records: CoeStructuredReview[]): Co
         departmentIds: input.departmentIds ?? [],
         updatedBy: input.updatedBy ?? 'CoE Reviewer',
         updatedOn: new Date().toISOString().split('T')[0],
+      };
+      records.push(record);
+      return cloneRecord(record);
+    },
+  };
+}
+
+function createIdeaScorecardRepository(records: IdeaScorecard[]): IdeaScorecardRepository {
+  return {
+    async getBySubmissionId(submissionId: string) {
+      const record = records.find((r) => r.submissionId === submissionId);
+      return record ? cloneRecord(record) : null;
+    },
+    async save(input: Partial<IdeaScorecard> & { submissionId: string }) {
+      const scores = {
+        businessValue: input.businessValueScore,
+        efficiency: input.efficiencyScore,
+        adoption: input.adoptionScore,
+        trustGovernance: input.trustGovernanceScore,
+        technicalPerformance: input.technicalPerformanceScore,
+      };
+      const index = records.findIndex((r) => r.submissionId === input.submissionId);
+      if (index >= 0) {
+        const merged = { ...records[index], ...input };
+        merged.weightedTotal = computeWeightedTotal({
+          businessValue: merged.businessValueScore,
+          efficiency: merged.efficiencyScore,
+          adoption: merged.adoptionScore,
+          trustGovernance: merged.trustGovernanceScore,
+          technicalPerformance: merged.technicalPerformanceScore,
+        });
+        merged.scoredBy = input.scoredBy ?? records[index].scoredBy;
+        merged.scoredByName = input.scoredByName ?? records[index].scoredByName ?? 'CoE Reviewer';
+        merged.scoredOn = new Date().toISOString().split('T')[0];
+        records[index] = merged;
+        return cloneRecord(records[index]);
+      }
+
+      const record: IdeaScorecard = {
+        id: crypto.randomUUID(),
+        submissionId: input.submissionId,
+        businessValueScore: input.businessValueScore,
+        efficiencyScore: input.efficiencyScore,
+        adoptionScore: input.adoptionScore,
+        trustGovernanceScore: input.trustGovernanceScore,
+        technicalPerformanceScore: input.technicalPerformanceScore,
+        businessValueNotes: input.businessValueNotes,
+        efficiencyNotes: input.efficiencyNotes,
+        adoptionNotes: input.adoptionNotes,
+        trustGovernanceNotes: input.trustGovernanceNotes,
+        technicalPerformanceNotes: input.technicalPerformanceNotes,
+        weightedTotal: computeWeightedTotal(scores),
+        scoredBy: input.scoredBy,
+        scoredByName: input.scoredByName ?? 'CoE Reviewer',
+        scoredOn: new Date().toISOString().split('T')[0],
       };
       records.push(record);
       return cloneRecord(record);
@@ -356,6 +415,7 @@ export function createMockDataProvider(): AppDataProvider {
   const stageStore = mockApprovalStageRecords.map(cloneRecord);
   const lookupStore = mockLookupOptions.map(cloneRecord);
   const reviewStore = mockCoeStructuredReviews.map(cloneRecord);
+  const scorecardStore = mockIdeaScorecards.map(cloneRecord);
   const noteStore = mockCoeNotes.map(cloneRecord);
   const approvalHistoryStore = mockCoeApprovalHistory.map(cloneRecord);
   const usersStore = mockDirectoryUsers.map(cloneRecord);
@@ -367,6 +427,7 @@ export function createMockDataProvider(): AppDataProvider {
     approvalStages: createApprovalStageRepository(stageStore),
     lookupOptions: createLookupOptionRepository(lookupStore),
     coeStructuredReviews: createCoeStructuredReviewRepository(reviewStore),
+    ideaScorecards: createIdeaScorecardRepository(scorecardStore),
     coeNotes: createCoeNoteRepository(noteStore),
     coeApprovalHistory: createCoeApprovalHistoryRepository(approvalHistoryStore),
     aiCoeRoles: createAiCoeRoleRepository(lookupStore),

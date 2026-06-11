@@ -42,6 +42,7 @@ import {
   useLookupOptions,
   useCoeStructuredReview,
   useSaveCoeStructuredReview,
+  useIdeaScorecard,
   useCoeNotes,
   useCreateCoeNote,
   useCoeApprovalHistory,
@@ -437,6 +438,7 @@ export default function SubmissionDetailPage() {
   const canLoadRelatedData = Boolean(relatedSubmissionId);
   const saveIdeaSubmission = useSaveIdeaSubmission();
   const { data: structuredReview } = useCoeStructuredReview(relatedSubmissionId);
+  const { data: scorecard } = useIdeaScorecard(relatedSubmissionId);
   const { data: notes = [] } = useCoeNotes(relatedSubmissionId);
   const { data: members = [], isLoading: membersLoading } = useAiCoeTeam(canLoadRelatedData);
   const { data: approvals = [], isLoading: approvalsLoading } = useAiCoeTeamApprovals(relatedSubmissionId);
@@ -919,7 +921,19 @@ export default function SubmissionDetailPage() {
           <Link to="/dashboard">← Back to Dashboard</Link>
         </Button>
         <div className="flex items-start justify-between gap-4">
-          <h1 className="text-2xl font-semibold tracking-tight">{submission.title}</h1>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-semibold tracking-tight">{submission.title}</h1>
+            <Button variant="outline" size="sm" asChild>
+              <Link to={`/submissions/${submission.id}/scorecard`}>
+                Scorecard
+                {typeof scorecard?.weightedTotal === 'number' && (
+                  <Badge variant="secondary" className="ml-2">
+                    {scorecard.weightedTotal} / 100
+                  </Badge>
+                )}
+              </Link>
+            </Button>
+          </div>
           <div className="flex items-start gap-3 shrink-0">
             <div className="min-w-48 space-y-1.5">
               <Label>Update submission status to:</Label>

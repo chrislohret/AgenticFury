@@ -24,6 +24,16 @@
     },
     {
       "type": "ManyToOne",
+      "fromTable": "afp_ideascorecard",
+      "toTable": "afp_idearequirement",
+      "referencingEntity": "afp_ideascorecard",
+      "referencedEntity": "afp_idearequirement",
+      "schemaName": "afp_IdeaScorecard_IdeaRequirement",
+      "lookupSchemaName": "afp_SubmissionId",
+      "lookupDisplayName": "Submission"
+    },
+    {
+      "type": "ManyToOne",
       "fromTable": "afp_coestructuredreviewselection",
       "toTable": "afp_coestructuredreview",
       "referencingEntity": "afp_coestructuredreviewselection",

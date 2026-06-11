@@ -369,6 +369,139 @@
       ]
     },
     {
+      "schemaName": "afp_IdeaScorecard",
+      "displayName": "Idea Scorecard",
+      "displayCollectionName": "Idea Scorecards",
+      "logicalSingularName": "afp_ideascorecard",
+      "logicalPluralName": "afp_ideascorecards",
+      "entitySetName": "afp_ideascorecards",
+      "tableLogicalName": "afp_ideascorecards",
+      "description": "Weighted 0-100 evaluation scorecard for a submitted idea. One scorecard per submission (1:1).",
+      "ownership": "UserOwned",
+      "ownershipType": "UserOwned",
+      "isActivity": false,
+      "hasActivities": false,
+      "hasNotes": false,
+      "primaryName": {
+        "schemaName": "afp_Name",
+        "displayName": "Name",
+        "description": "Auto-generated scorecard name",
+        "maxLength": 200
+      },
+      "columns": [
+        {
+          "schemaName": "afp_BusinessValueScore",
+          "displayName": "Business Value Score",
+          "logicalName": "afp_businessvaluescore",
+          "type": "WholeNumber",
+          "minValue": 0,
+          "maxValue": 5,
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_EfficiencyScore",
+          "displayName": "Operational Efficiency Score",
+          "logicalName": "afp_efficiencyscore",
+          "type": "WholeNumber",
+          "minValue": 0,
+          "maxValue": 5,
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_AdoptionScore",
+          "displayName": "Adoption & Experience Score",
+          "logicalName": "afp_adoptionscore",
+          "type": "WholeNumber",
+          "minValue": 0,
+          "maxValue": 5,
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_TrustGovernanceScore",
+          "displayName": "Trust & Governance Score",
+          "logicalName": "afp_trustgovernancescore",
+          "type": "WholeNumber",
+          "minValue": 0,
+          "maxValue": 5,
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_TechnicalPerformanceScore",
+          "displayName": "Technical Performance Score",
+          "logicalName": "afp_technicalperformancescore",
+          "type": "WholeNumber",
+          "minValue": 0,
+          "maxValue": 5,
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_BusinessValueNotes",
+          "displayName": "Business Value Notes",
+          "logicalName": "afp_businessvaluenotes",
+          "type": "Memo",
+          "maxLength": 2000,
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_EfficiencyNotes",
+          "displayName": "Operational Efficiency Notes",
+          "logicalName": "afp_efficiencynotes",
+          "type": "Memo",
+          "maxLength": 2000,
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_AdoptionNotes",
+          "displayName": "Adoption & Experience Notes",
+          "logicalName": "afp_adoptionnotes",
+          "type": "Memo",
+          "maxLength": 2000,
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_TrustGovernanceNotes",
+          "displayName": "Trust & Governance Notes",
+          "logicalName": "afp_trustgovernancenotes",
+          "type": "Memo",
+          "maxLength": 2000,
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_TechnicalPerformanceNotes",
+          "displayName": "Technical Performance Notes",
+          "logicalName": "afp_technicalperformancenotes",
+          "type": "Memo",
+          "maxLength": 2000,
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_WeightedTotal",
+          "displayName": "Weighted Total",
+          "logicalName": "afp_weightedtotal",
+          "type": "Decimal",
+          "precision": 2,
+          "minValue": 0,
+          "maxValue": 100,
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_ScoredBy",
+          "displayName": "Scored By",
+          "logicalName": "afp_scoredby",
+          "type": "Lookup",
+          "lookupTarget": "systemuser",
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_ScoredOn",
+          "displayName": "Scored On",
+          "logicalName": "afp_scoredon",
+          "type": "DateTime",
+          "requiredLevel": "None"
+        }
+      ]
+    },
+    {
       "schemaName": "afp_AiCoeTeamMember",
       "displayName": "AI CoE Team Member",
       "displayCollectionName": "AI CoE Team Members",
@@ -562,6 +695,16 @@
       "referencingEntity": "afp_coestructuredreview",
       "referencedEntity": "afp_idearequirement",
       "schemaName": "afp_CoeStructuredReview_IdeaRequirement",
+      "lookupSchemaName": "afp_SubmissionId",
+      "lookupDisplayName": "Submission"
+    },
+    {
+      "type": "ManyToOne",
+      "fromTable": "afp_ideascorecard",
+      "toTable": "afp_idearequirement",
+      "referencingEntity": "afp_ideascorecard",
+      "referencedEntity": "afp_idearequirement",
+      "schemaName": "afp_IdeaScorecard_IdeaRequirement",
       "lookupSchemaName": "afp_SubmissionId",
       "lookupDisplayName": "Submission"
     },

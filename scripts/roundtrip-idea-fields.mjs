@@ -187,6 +187,56 @@ async function main() {
       if (!ok) anyFail = true;
       console.log(`  ${ok ? '✓' : '❌'} ${k}: sent=${JSON.stringify(v)} got=${JSON.stringify(got)}`);
     }
+
+    // 4) Idea scorecard (1:1 lookup to the idea). Scores 0-5, computed weighted total 0-100.
+    const scorecardId = uuid();
+    const scorecardBody = {
+      afp_name: `Scorecard - ${ideaId}`,
+      'afp_submissionid@odata.bind': `/afp_idearequirements(${ideaId})`,
+      afp_businessvaluescore: 4,
+      afp_efficiencyscore: 3,
+      afp_adoptionscore: 4,
+      afp_trustgovernancescore: 3,
+      afp_technicalperformancescore: 4,
+      afp_businessvaluenotes: 'bv-notes',
+      afp_efficiencynotes: 'eff-notes',
+      afp_adoptionnotes: 'adopt-notes',
+      afp_trustgovernancenotes: 'trust-notes',
+      afp_technicalperformancenotes: 'tech-notes',
+      afp_weightedtotal: 71, // ((4/5)*25)+((3/5)*20)+((4/5)*15)+((3/5)*25)+((4/5)*15)
+      afp_scoredon: new Date().toISOString(),
+    };
+    await upsert(token, 'afp_ideascorecards', scorecardId, scorecardBody);
+    cleanup.push(['afp_ideascorecards', scorecardId]);
+
+    const scorecardBack = await getRow(
+      token,
+      'afp_ideascorecards',
+      scorecardId,
+      'afp_name,_afp_submissionid_value,afp_businessvaluescore,afp_efficiencyscore,afp_adoptionscore,afp_trustgovernancescore,afp_technicalperformancescore,afp_businessvaluenotes,afp_efficiencynotes,afp_adoptionnotes,afp_trustgovernancenotes,afp_technicalperformancenotes,afp_weightedtotal,afp_scoredon',
+    );
+    console.log('\n## afp_ideascorecard round-trip');
+    const scorecardChecks = {
+      afp_name: scorecardBody.afp_name,
+      _afp_submissionid_value: ideaId,
+      afp_businessvaluescore: scorecardBody.afp_businessvaluescore,
+      afp_efficiencyscore: scorecardBody.afp_efficiencyscore,
+      afp_adoptionscore: scorecardBody.afp_adoptionscore,
+      afp_trustgovernancescore: scorecardBody.afp_trustgovernancescore,
+      afp_technicalperformancescore: scorecardBody.afp_technicalperformancescore,
+      afp_businessvaluenotes: scorecardBody.afp_businessvaluenotes,
+      afp_efficiencynotes: scorecardBody.afp_efficiencynotes,
+      afp_adoptionnotes: scorecardBody.afp_adoptionnotes,
+      afp_trustgovernancenotes: scorecardBody.afp_trustgovernancenotes,
+      afp_technicalperformancenotes: scorecardBody.afp_technicalperformancenotes,
+      afp_weightedtotal: scorecardBody.afp_weightedtotal,
+    };
+    for (const [k, v] of Object.entries(scorecardChecks)) {
+      const got = scorecardBack[k];
+      const ok = String(got).toLowerCase() === String(v).toLowerCase();
+      if (!ok) anyFail = true;
+      console.log(`  ${ok ? '✓' : '❌'} ${k}: sent=${JSON.stringify(v)} got=${JSON.stringify(got)}`);
+    }
   } catch (err) {
     anyFail = true;
     console.log(`\n❌ ERROR: ${err.message}`);

@@ -7,6 +7,7 @@ import type {
   LookupCategory,
   LookupOption,
   CoeStructuredReview,
+  IdeaScorecard,
   CoeNote,
   CoeApprovalHistoryEntry,
   AiCoeRole,
@@ -24,6 +25,7 @@ export const queryKeys = {
   approvalStages: (submissionId: string) => ['approvalStages', submissionId] as const,
   lookupOptionsByCategory: (category: LookupCategory) => ['lookupOptions', category] as const,
   coeStructuredReviewBySubmission: (submissionId: string) => ['coeStructuredReview', submissionId] as const,
+  ideaScorecardBySubmission: (submissionId: string) => ['ideaScorecard', submissionId] as const,
   coeNotesBySubmission: (submissionId: string) => ['coeNotes', submissionId] as const,
   coeApprovalHistoryBySubmission: (submissionId: string) => ['coeApprovalHistory', submissionId] as const,
   aiCoeTeam: ['aiCoeTeam'] as const,
@@ -180,6 +182,33 @@ export function useSaveCoeStructuredReview() {
       queryClient.setQueryData(queryKeys.coeStructuredReviewBySubmission(record.submissionId), record);
       queryClient.invalidateQueries({
         queryKey: queryKeys.coeStructuredReviewBySubmission(record.submissionId),
+      });
+    },
+  });
+}
+
+export function useIdeaScorecard(submissionId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.ideaScorecardBySubmission(submissionId || ''),
+    queryFn: () => (
+      submissionId
+        ? provider.ideaScorecards.getBySubmissionId(submissionId)
+        : Promise.resolve(null as IdeaScorecard | null)
+    ),
+    enabled: Boolean(submissionId),
+  });
+}
+
+export function useSaveIdeaScorecard() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Partial<IdeaScorecard> & { submissionId: string }) => (
+      provider.ideaScorecards.save(input)
+    ),
+    onSuccess: (record) => {
+      queryClient.setQueryData(queryKeys.ideaScorecardBySubmission(record.submissionId), record);
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.ideaScorecardBySubmission(record.submissionId),
       });
     },
   });

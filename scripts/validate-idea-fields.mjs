@@ -40,6 +40,23 @@ const REQUIRED = {
     'afp_reviewid',
     'afp_optionid',
   ],
+  afp_ideascorecard: [
+    'afp_name',
+    'afp_submissionid',
+    'afp_businessvaluescore',
+    'afp_efficiencyscore',
+    'afp_adoptionscore',
+    'afp_trustgovernancescore',
+    'afp_technicalperformancescore',
+    'afp_businessvaluenotes',
+    'afp_efficiencynotes',
+    'afp_adoptionnotes',
+    'afp_trustgovernancenotes',
+    'afp_technicalperformancenotes',
+    'afp_weightedtotal',
+    'afp_scoredby',
+    'afp_scoredon',
+  ],
 };
 
 async function getToken() {

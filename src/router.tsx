@@ -5,6 +5,7 @@ import DashboardPage from "@/pages/dashboard"
 import SubmitIdeaPage from "@/pages/submit-idea"
 import MySubmissionsPage from "@/pages/my-submissions"
 import SubmissionDetailPage from "@/pages/submission-detail"
+import ScorecardPage from "@/pages/scorecard"
 import LookupTablesPage from "@/pages/lookup-tables"
 import CoeRolesPage from "@/pages/coe-roles"
 import AiCoeTeamPage from "@/pages/ai-coe-team"
@@ -38,6 +39,7 @@ export const router = createHashRouter([
       { path: "coe-roles", element: <CoeRolesPage /> },
       { path: "ai-coe-team", element: <AiCoeTeamPage /> },
       { path: "submissions/:id", element: <SubmissionDetailPage /> },
+      { path: "submissions/:id/scorecard", element: <ScorecardPage /> },
     ],
   },
 ])

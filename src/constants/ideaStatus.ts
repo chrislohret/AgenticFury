@@ -11,6 +11,27 @@ export const IDEA_STATUS = {
 
 export type IdeaStatusValue = (typeof IDEA_STATUS)[keyof typeof IDEA_STATUS];
 
+// Each idea statuscode (Status Reason) belongs to a specific statecode (Status).
+// Dataverse rejects a statuscode that does not match the record's current
+// statecode unless BOTH are sent together on the update, so writes must include
+// the matching statecode. Mirrors the oobLifecycle mapping in
+// dataverse/planning-payload.json.
+export const IDEA_STATE = {
+  ACTIVE: 0,
+  INACTIVE: 1,
+} as const;
+
+export const IDEA_STATUS_STATECODE: Record<number, number> = {
+  [IDEA_STATUS.DRAFT]: IDEA_STATE.ACTIVE,
+  [IDEA_STATUS.SUBMITTED]: IDEA_STATE.ACTIVE,
+  [IDEA_STATUS.UNDER_REVIEW]: IDEA_STATE.ACTIVE,
+  [IDEA_STATUS.APPROVED]: IDEA_STATE.INACTIVE,
+  [IDEA_STATUS.REJECTED]: IDEA_STATE.INACTIVE,
+  [IDEA_STATUS.ON_HOLD]: IDEA_STATE.ACTIVE,
+  [IDEA_STATUS.IN_PROGRESS]: IDEA_STATE.ACTIVE,
+  [IDEA_STATUS.COMPLETED]: IDEA_STATE.INACTIVE,
+};
+
 export const IDEA_STATUS_LABELS: Record<number, string> = {
   [IDEA_STATUS.DRAFT]: 'Draft',
   [IDEA_STATUS.SUBMITTED]: 'Submitted',

@@ -7,6 +7,7 @@
     "afp_lookupoptions",
     "afp_coestructuredreviews",
     "afp_coestructuredreviewselections",
+    "afp_ideascorecards",
     "afp_aicoeteammembers",
     "afp_aicoeteamapprovals",
     "afp_approvalhistoryentries"
@@ -17,6 +18,7 @@
     "~/.dotnet/tools/pac code add-data-source -a dataverse -t afp_lookupoptions",
     "~/.dotnet/tools/pac code add-data-source -a dataverse -t afp_coestructuredreviews",
     "~/.dotnet/tools/pac code add-data-source -a dataverse -t afp_coestructuredreviewselections",
+    "~/.dotnet/tools/pac code add-data-source -a dataverse -t afp_ideascorecards",
     "~/.dotnet/tools/pac code add-data-source -a dataverse -t afp_aicoeteammembers",
     "~/.dotnet/tools/pac code add-data-source -a dataverse -t afp_aicoeteamapprovals",
     "~/.dotnet/tools/pac code add-data-source -a dataverse -t afp_approvalhistoryentries"

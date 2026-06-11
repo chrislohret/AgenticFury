@@ -3,7 +3,8 @@ import type { IOperationResult } from '@microsoft/power-apps/data';
 import { getClient } from '@microsoft/power-apps/data';
 import { dataSourcesInfo } from '../../.power/schemas/appschemas/dataSourcesInfo';
 import { MicrosoftDataverseService } from '@/generated/services/MicrosoftDataverseService';
-import { IDEA_STATUS } from '@/constants/ideaStatus';
+import { IDEA_STATUS, IDEA_STATUS_STATECODE, IDEA_STATE } from '@/constants/ideaStatus';
+import { computeWeightedTotal } from '@/lib/scorecard';
 import { getFieldMetadata } from '@/services/field-metadata-cache';
 import type { AppDataProvider } from '@/services/data-contracts';
 import type {
@@ -15,6 +16,7 @@ import type {
   CoeApprovalHistoryEntry,
   CoeNote,
   CoeStructuredReview,
+  IdeaScorecard,
   DirectoryUser,
   IdeaSubmission,
   LookupCategory,
@@ -34,6 +36,7 @@ const TABLES = {
   lookupOption: 'afp_lookupoptions',
   structuredReview: 'afp_coestructuredreviews',
   structuredReviewSelection: 'afp_coestructuredreviewselections',
+  scorecard: 'afp_ideascorecards',
   approvalHistory: 'afp_approvalhistoryentries',
   aiCoeRole: 'afp_aicoeroleses',
   teamMember: 'afp_aicoeteammembers',
@@ -406,6 +409,7 @@ function getRecordGuid(record: DataverseRecord): string {
       record.afp_lookupoptionid ??
       record.afp_coestructuredreviewid ??
       record.afp_coestructuredreviewselectionid ??
+      record.afp_ideascorecardid ??
       record.afp_approvalhistoryentryid ??
       record.afp_aicoeteammemberid ??
       record.afp_aicoeteamapprovalid ??
@@ -575,6 +579,30 @@ function mapStructuredReview(record: DataverseRecord, selections: LookupOption[]
   };
 }
 
+function mapScorecard(record: DataverseRecord): IdeaScorecard {
+  const scoredByName = normalizeText(
+    record['_afp_scoredby_value@OData.Community.Display.V1.FormattedValue'],
+  );
+  return {
+    id: getRecordGuid(record),
+    submissionId: normalizeId(record._afp_submissionid_value ?? record.afp_submissionid) || '',
+    businessValueScore: normalizeNumber(record.afp_businessvaluescore),
+    efficiencyScore: normalizeNumber(record.afp_efficiencyscore),
+    adoptionScore: normalizeNumber(record.afp_adoptionscore),
+    trustGovernanceScore: normalizeNumber(record.afp_trustgovernancescore),
+    technicalPerformanceScore: normalizeNumber(record.afp_technicalperformancescore),
+    businessValueNotes: normalizeText(record.afp_businessvaluenotes) || undefined,
+    efficiencyNotes: normalizeText(record.afp_efficiencynotes) || undefined,
+    adoptionNotes: normalizeText(record.afp_adoptionnotes) || undefined,
+    trustGovernanceNotes: normalizeText(record.afp_trustgovernancenotes) || undefined,
+    technicalPerformanceNotes: normalizeText(record.afp_technicalperformancenotes) || undefined,
+    weightedTotal: normalizeNumber(record.afp_weightedtotal),
+    scoredBy: normalizeId(record._afp_scoredby_value) || undefined,
+    scoredByName: scoredByName || undefined,
+    scoredOn: normalizeDate(record.afp_scoredon) || undefined,
+  };
+}
+
 async function loadCurrentUserName(): Promise<string> {
   const context = await getCurrentUserContext();
   return context?.fullName || 'Current user';
@@ -728,6 +756,7 @@ export function createRealDataProvider(): AppDataProvider {
       async save(input: Partial<IdeaSubmission>) {
         const id = input.id ?? crypto.randomUUID();
         const existing = input.id ? await buildIdeaFromDataverse(input.id) : null;
+        const statusValue = input.status ?? existing?.status ?? IDEA_STATUS.DRAFT;
         const body: DataverseRecord = {
           afp_title: input.title ?? existing?.title ?? '',
           afp_businessobjectives: input.businessObjectives ?? existing?.businessObjectives ?? '',
@@ -745,7 +774,12 @@ export function createRealDataProvider(): AppDataProvider {
           afp_datasourcenotes: input.dataSourceNotes ?? existing?.dataSourceNotes ?? '',
           afp_overallcostnoteshtml: input.overallCostNotesHtml ?? existing?.overallCostNotesHtml ?? '',
           afp_aiplatformselection: input.aiPlatformSelection ?? existing?.aiPlatformSelection ?? null,
-          statuscode: input.status ?? existing?.status ?? IDEA_STATUS.DRAFT,
+          statuscode: statusValue,
+          // Dataverse rejects a statuscode that belongs to a different statecode
+          // than the record currently has unless both are sent together. Always
+          // include the matching statecode so transitions into Inactive statuses
+          // (Approved/Rejected/Completed) persist instead of silently reverting.
+          statecode: IDEA_STATUS_STATECODE[statusValue] ?? IDEA_STATE.ACTIVE,
         };
 
         await upsertRow(TABLES.idea, id, body);
@@ -954,6 +988,99 @@ export function createRealDataProvider(): AppDataProvider {
           },
           selectedOptions,
         );
+      },
+    },
+    ideaScorecards: {
+      async getBySubmissionId(submissionId: string) {
+        const rows = await listRows(
+          TABLES.scorecard,
+          selectFields([
+            'afp_ideascorecardid',
+            '_afp_submissionid_value',
+            'afp_businessvaluescore',
+            'afp_efficiencyscore',
+            'afp_adoptionscore',
+            'afp_trustgovernancescore',
+            'afp_technicalperformancescore',
+            'afp_businessvaluenotes',
+            'afp_efficiencynotes',
+            'afp_adoptionnotes',
+            'afp_trustgovernancenotes',
+            'afp_technicalperformancenotes',
+            'afp_weightedtotal',
+            '_afp_scoredby_value',
+            'afp_scoredon',
+          ]),
+        );
+        const record = rows.find(
+          (row) => normalizeId(row._afp_submissionid_value ?? row.afp_submissionid) === submissionId,
+        );
+        return record ? mapScorecard(record) : null;
+      },
+      async save(input: Partial<IdeaScorecard> & { submissionId: string }) {
+        const existing = await this.getBySubmissionId(input.submissionId);
+        const scorecardId = existing?.id ?? input.id ?? crypto.randomUUID();
+
+        const businessValueScore = input.businessValueScore ?? existing?.businessValueScore;
+        const efficiencyScore = input.efficiencyScore ?? existing?.efficiencyScore;
+        const adoptionScore = input.adoptionScore ?? existing?.adoptionScore;
+        const trustGovernanceScore = input.trustGovernanceScore ?? existing?.trustGovernanceScore;
+        const technicalPerformanceScore = input.technicalPerformanceScore ?? existing?.technicalPerformanceScore;
+
+        const weightedTotal = computeWeightedTotal({
+          businessValue: businessValueScore,
+          efficiency: efficiencyScore,
+          adoption: adoptionScore,
+          trustGovernance: trustGovernanceScore,
+          technicalPerformance: technicalPerformanceScore,
+        });
+
+        const scoredOn = input.scoredOn ?? new Date().toISOString();
+        const scorerId = await getCurrentSystemUserId();
+        const scoredByName = input.scoredByName ?? (await loadCurrentUserName());
+
+        const body: DataverseRecord = {
+          afp_name: `Scorecard - ${input.submissionId}`,
+          'afp_SubmissionId@odata.bind': `/${TABLES.idea}(${input.submissionId})`,
+          afp_businessvaluescore: businessValueScore ?? null,
+          afp_efficiencyscore: efficiencyScore ?? null,
+          afp_adoptionscore: adoptionScore ?? null,
+          afp_trustgovernancescore: trustGovernanceScore ?? null,
+          afp_technicalperformancescore: technicalPerformanceScore ?? null,
+          afp_businessvaluenotes: input.businessValueNotes ?? existing?.businessValueNotes ?? null,
+          afp_efficiencynotes: input.efficiencyNotes ?? existing?.efficiencyNotes ?? null,
+          afp_adoptionnotes: input.adoptionNotes ?? existing?.adoptionNotes ?? null,
+          afp_trustgovernancenotes: input.trustGovernanceNotes ?? existing?.trustGovernanceNotes ?? null,
+          afp_technicalperformancenotes:
+            input.technicalPerformanceNotes ?? existing?.technicalPerformanceNotes ?? null,
+          afp_weightedtotal: weightedTotal,
+          afp_scoredon: scoredOn,
+        };
+        if (scorerId) {
+          body['afp_ScoredBy@odata.bind'] = `/${TABLES.systemUser}(${scorerId})`;
+        }
+
+        await upsertRow(TABLES.scorecard, scorecardId, body);
+
+        return {
+          id: scorecardId,
+          submissionId: input.submissionId,
+          businessValueScore,
+          efficiencyScore,
+          adoptionScore,
+          trustGovernanceScore,
+          technicalPerformanceScore,
+          businessValueNotes: input.businessValueNotes ?? existing?.businessValueNotes,
+          efficiencyNotes: input.efficiencyNotes ?? existing?.efficiencyNotes,
+          adoptionNotes: input.adoptionNotes ?? existing?.adoptionNotes,
+          trustGovernanceNotes: input.trustGovernanceNotes ?? existing?.trustGovernanceNotes,
+          technicalPerformanceNotes:
+            input.technicalPerformanceNotes ?? existing?.technicalPerformanceNotes,
+          weightedTotal,
+          scoredBy: scorerId ?? existing?.scoredBy,
+          scoredByName,
+          scoredOn,
+        } satisfies IdeaScorecard;
       },
     },
     coeNotes: {

@@ -37,4 +37,13 @@ export const mockAiCoeTeamMembers: AiCoeTeamMember[] = [
     roleId: 'lkp-coe-role-5',
     addedOn: '2026-02-01',
   },
+  {
+    id: 'team-5',
+    memberId: 'systemuser-mock-1',
+    userId: 'systemuser-mock-1',
+    userName: 'Chris Lohret',
+    userEmail: 'chris.lohret@microsoft.com',
+    roleId: 'lkp-coe-role-1',
+    addedOn: '2026-02-10',
+  },
 ];

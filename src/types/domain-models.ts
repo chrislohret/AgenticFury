@@ -120,6 +120,31 @@ export interface CoeStructuredReview {
 }
 
 /**
+ * Weighted evaluation scorecard for a submitted idea. Has a 1:1 relationship
+ * with the idea submission (one scorecard per submission). Each dimension is
+ * scored 0–5; `weightedTotal` is the persisted 0–100 weighted result. The
+ * scorer is a Dataverse `systemuser` lookup (`afp_scoredby`).
+ */
+export interface IdeaScorecard {
+  id: string;
+  submissionId: string;
+  businessValueScore?: number;
+  efficiencyScore?: number;
+  adoptionScore?: number;
+  trustGovernanceScore?: number;
+  technicalPerformanceScore?: number;
+  businessValueNotes?: string;
+  efficiencyNotes?: string;
+  adoptionNotes?: string;
+  trustGovernanceNotes?: string;
+  technicalPerformanceNotes?: string;
+  weightedTotal?: number;
+  scoredBy?: string;     // systemuser GUID (afp_scoredby lookup)
+  scoredByName?: string; // expanded systemuser fullname
+  scoredOn?: string;     // ISO 8601
+}
+
+/**
  * Maps to the Dataverse `annotation` (Notes) OOB activity table.
  * objectid relates to afp_ideasubmission; createdby / createdon are system-populated.
  * The MDA timeline control renders these automatically when the annotation table

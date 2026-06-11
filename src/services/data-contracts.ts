@@ -5,6 +5,7 @@ import type {
   LookupOption,
   LookupCategory,
   CoeStructuredReview,
+  IdeaScorecard,
   CoeNote,
   CoeApprovalHistoryEntry,
   DirectoryUser,
@@ -56,6 +57,16 @@ export interface CoeStructuredReviewRepository {
 }
 
 /**
+ * One scorecard per submission (1:1). `save` upserts by submissionId and the
+ * provider computes/persists the weighted total and stamps the current user as
+ * the scorer.
+ */
+export interface IdeaScorecardRepository {
+  getBySubmissionId(submissionId: string): Promise<IdeaScorecard | null>;
+  save(input: Partial<IdeaScorecard> & { submissionId: string }): Promise<IdeaScorecard>;
+}
+
+/**
  * Backed by the Dataverse `annotation` OOB activity table.
  * Notes are append-only in the Dataverse timeline — create only, no edit.
  */
@@ -102,6 +113,7 @@ export interface AppDataProvider {
   approvalStages: ApprovalStageRepository;
   lookupOptions: LookupOptionRepository;
   coeStructuredReviews: CoeStructuredReviewRepository;
+  ideaScorecards: IdeaScorecardRepository;
   coeNotes: CoeNoteRepository;
   coeApprovalHistory: CoeApprovalHistoryRepository;
   aiCoeRoles: AiCoeRoleRepository;
