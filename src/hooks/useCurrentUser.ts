@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { getContext } from '@microsoft/power-apps/app';
-import { useAiCoeTeam } from '@/hooks/usePrototypeData';
+import { useCurrentUserTeams } from '@/hooks/usePrototypeData';
+import { AI_COE_FULL_TEAM_NAME } from '@/constants/security';
 
 export interface CurrentUser {
   id: string;
@@ -56,19 +57,20 @@ export function useCurrentUser() {
 }
 
 /**
- * Determines whether the signed-in user is a CoE administrator by matching
- * their email against the AI CoE Team roster. While either source is still
- * loading, `isLoading` is true and `isAdmin` is false. Admin-only UI should
- * stay hidden until this resolves to avoid a flash of restricted navigation.
+ * Determines whether the signed-in user is a CoE administrator by checking
+ * membership in the "AI CoE Team Full" Dataverse owner team. This mirrors the
+ * platform security model: members of that team hold the full-access security
+ * role and therefore administer the solution. The AI CoE Roles application
+ * data (`afp_aicoeroles`) is unrelated and is not consulted here.
+ *
+ * While the team membership is still loading, `isLoading` is true and
+ * `isAdmin` is false. Admin-only UI should stay hidden until this resolves to
+ * avoid a flash of restricted navigation.
  */
 export function useIsCoeAdmin() {
-  const { data: user, isLoading: userLoading } = useCurrentUser();
-  const { data: members = [], isLoading: membersLoading } = useAiCoeTeam();
+  const { data: teams = [], isLoading } = useCurrentUserTeams();
 
-  const email = user?.email?.trim().toLowerCase();
-  const isAdmin = Boolean(
-    email && members.some((m) => m.userEmail?.trim().toLowerCase() === email),
-  );
+  const isAdmin = teams.some((name) => name.trim() === AI_COE_FULL_TEAM_NAME);
 
-  return { isAdmin, isLoading: userLoading || membersLoading };
+  return { isAdmin, isLoading };
 }

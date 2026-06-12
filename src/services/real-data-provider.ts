@@ -1505,6 +1505,25 @@ export function createRealDataProvider(): AppDataProvider {
           .sort((a, b) => a.displayName.localeCompare(b.displayName));
       },
     },
+    currentUser: {
+      async getTeamNames() {
+        const systemUserId = await getCurrentSystemUserId();
+        if (!systemUserId) return [];
+
+        const record = await getRow(
+          TABLES.systemUser,
+          systemUserId,
+          'systemuserid',
+          'teammembership_association($select=name)',
+        );
+        const teams = Array.isArray(record?.teammembership_association)
+          ? (record!.teammembership_association as DataverseRecord[])
+          : [];
+        return teams
+          .map((team) => (typeof team.name === 'string' ? team.name : ''))
+          .filter((name): name is string => Boolean(name));
+      },
+    },
     fieldMetadata: { getField: getFieldMetadata },
   } satisfies AppDataProvider;
 }

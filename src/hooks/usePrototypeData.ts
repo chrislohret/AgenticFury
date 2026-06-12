@@ -39,6 +39,7 @@ export const queryKeys = {
   aiCoeTeamApprovalsBySubmission: (submissionId: string) => ['aiCoeTeamApprovals', submissionId] as const,
   ideaRealizationBySubmission: (submissionId: string) => ['ideaRealization', submissionId] as const,
   directoryUsers: ['directoryUsers'] as const,
+  currentUserTeams: ['currentUser', 'teams'] as const,
 };
 
 export function useIdeaSubmissions() {
@@ -337,6 +338,14 @@ export function useDirectoryUsers() {
   return useQuery({
     queryKey: queryKeys.directoryUsers,
     queryFn: () => provider.directoryUsers.list(),
+    staleTime: 30 * 60 * 1000,
+  });
+}
+
+export function useCurrentUserTeams() {
+  return useQuery({
+    queryKey: queryKeys.currentUserTeams,
+    queryFn: () => provider.currentUser.getTeamNames(),
     staleTime: 30 * 60 * 1000,
   });
 }

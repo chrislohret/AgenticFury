@@ -99,6 +99,16 @@ export interface DirectoryUserRepository {
   list(): Promise<DirectoryUser[]>;
 }
 
+/**
+ * Exposes platform identity facts about the signed-in user that drive access
+ * control in the app. `getTeamNames` returns the names of every Dataverse team
+ * the current user belongs to, used to gate admin-only UI on membership in the
+ * "AI CoE Team Full" team.
+ */
+export interface CurrentUserRepository {
+  getTeamNames(): Promise<string[]>;
+}
+
 export interface AiCoeRoleRepository {
   list(): Promise<AiCoeRole[]>;
   save(input: { id?: string; name: string; description?: string }): Promise<AiCoeRole>;
@@ -152,5 +162,6 @@ export interface AppDataProvider {
   aiCoeTeamApprovals: AiCoeTeamApprovalRepository;
   ideaRealizations: IdeaRealizationRepository;
   directoryUsers: DirectoryUserRepository;
+  currentUser: CurrentUserRepository;
   fieldMetadata: FieldMetadataRepository;
 }

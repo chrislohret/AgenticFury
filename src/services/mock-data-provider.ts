@@ -31,6 +31,7 @@ import type {
   ScorecardWeight,
   IdeaRealization,
 } from '@/types/domain-models';
+import { AI_COE_FULL_TEAM_NAME } from '@/constants/security';
 import { mockIdeaSubmissions } from '@/mockData/ideaSubmission';
 import { mockApprovalStageRecords } from '@/mockData/approvalStageRecord';
 import { mockLookupOptions } from '@/mockData/lookupOption';
@@ -514,6 +515,13 @@ export function createMockDataProvider(): AppDataProvider {
     aiCoeTeamApprovals: createAiCoeTeamApprovalRepository(approvalStore),
     ideaRealizations: createIdeaRealizationRepository(realizationStore),
     directoryUsers: createDirectoryUserRepository(usersStore),
+    currentUser: {
+      // Mock mode treats the local user as a member of the AI CoE Team Full
+      // team so admin-only navigation is exercisable during prototype dev.
+      async getTeamNames() {
+        return [AI_COE_FULL_TEAM_NAME];
+      },
+    },
     fieldMetadata: {
       async getField() { return null; },
     },
