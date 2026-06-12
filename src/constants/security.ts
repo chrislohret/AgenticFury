@@ -13,4 +13,4 @@ export const AI_COE_FULL_TEAM_NAME = 'AI CoE Team Full';
  * solution. Retained here for reference; the app gates admin UI solely on
  * membership in {@link AI_COE_FULL_TEAM_NAME}.
  */
-export const AI_COE_READ_ONLY_TEAM_NAME = 'AI CoE Team Read Only';
+export const AI_COE_READ_ONLY_TEAM_NAME = 'AI CoE Team Read';

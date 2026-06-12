@@ -50,7 +50,7 @@ const CUSTOM_TABLES = [
   'afp_aicoeteamapproval',
   'afp_approvalhistoryentry',
   'afp_idearealization',
-  'afp_aicoerole',
+  'afp_aicoeroles',
 ];
 
 // The single table a Read Only user may create/edit (their own ideas).
@@ -154,7 +154,7 @@ async function getBaseRoleId() {
 }
 
 async function getRolePrivileges(roleId) {
-  const result = await request(`/roles(${roleId})/Microsoft.Dynamics.CRM.RetrieveRolePrivilegesRole`);
+  const result = await request(`/RetrieveRolePrivilegesRole(RoleId=${roleId})`);
   return result?.RolePrivileges ?? [];
 }
 
@@ -163,7 +163,7 @@ const privilegeCache = new Map();
 async function getEntityPrivileges(logicalName) {
   if (privilegeCache.has(logicalName)) return privilegeCache.get(logicalName);
   const result = await request(
-    `/EntityDefinitions(LogicalName='${logicalName}')?$select=LogicalName&$expand=Privileges`,
+    `/EntityDefinitions(LogicalName='${logicalName}')?$select=LogicalName,Privileges`,
   );
   const privileges = result?.Privileges ?? [];
   privilegeCache.set(logicalName, privileges);
@@ -238,6 +238,11 @@ async function buildReadRolePrivileges() {
 }
 
 async function baselineFromBaseRole(roleId) {
+  const existing = await getRolePrivileges(roleId);
+  if (existing.length > 0) {
+    console.log(`Role already has ${existing.length} privileges; skipping "${baseRoleName}" baseline.`);
+    return;
+  }
   const baseRoleId = await getBaseRoleId();
   if (!baseRoleId) {
     console.warn(
