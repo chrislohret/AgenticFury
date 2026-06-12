@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { getContext } from '@microsoft/power-apps/app';
+import { useAiCoeTeam } from '@/hooks/usePrototypeData';
 
 export interface CurrentUser {
   id: string;
@@ -52,4 +53,22 @@ export function useCurrentUser() {
   }, []);
 
   return { data: user, isLoading };
+}
+
+/**
+ * Determines whether the signed-in user is a CoE administrator by matching
+ * their email against the AI CoE Team roster. While either source is still
+ * loading, `isLoading` is true and `isAdmin` is false. Admin-only UI should
+ * stay hidden until this resolves to avoid a flash of restricted navigation.
+ */
+export function useIsCoeAdmin() {
+  const { data: user, isLoading: userLoading } = useCurrentUser();
+  const { data: members = [], isLoading: membersLoading } = useAiCoeTeam();
+
+  const email = user?.email?.trim().toLowerCase();
+  const isAdmin = Boolean(
+    email && members.some((m) => m.userEmail?.trim().toLowerCase() === email),
+  );
+
+  return { isAdmin, isLoading: userLoading || membersLoading };
 }

@@ -67,6 +67,14 @@
         "ideascorecards": {
           "entitySetName": "afp_ideascorecards",
           "logicalName": "afp_ideascorecard"
+        },
+        "scorecardweights": {
+          "entitySetName": "afp_scorecardweights",
+          "logicalName": "afp_scorecardweight"
+        },
+        "idearealizations": {
+          "entitySetName": "afp_idearealizations",
+          "logicalName": "afp_idearealization"
         }
       },
       "environmentVariableName": ""

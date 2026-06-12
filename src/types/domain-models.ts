@@ -1,6 +1,7 @@
+import type { ScorecardDimensionKey } from '@/constants/scorecard';
+
 export type ApprovalStage = 'coe-review' | 'it-signoff' | 'executive-approval';
-export type StageStatus = 'pending' | 'approved' | 'rejected' | 'on-hold';
-export type LookupCategory =
+export type StageStatus = 'pending' | 'approved' | 'rejected' | 'on-hold';export type LookupCategory =
   | 'business-objectives'
   | 'intended-user-roles'
   | 'data-sources'
@@ -33,8 +34,17 @@ export interface IdeaSubmission {
   aiPlatformSelection?: number;
   status: number;
   department?: string;
+  /**
+   * CoE-normalized department names mirrored from the structured review
+   * (afp_aicoedepartments). Empty/undefined until a reviewer normalizes the idea.
+   */
+  normalizedDepartments?: string[];
   submittedBy?: string;
   createdOn?: string;
+  /** systemuser GUID of the assigned AI CoE reviewer (afp_assignedreviewer lookup). */
+  assignedReviewer?: string;
+  /** Expanded systemuser fullname for the assigned reviewer. */
+  assignedReviewerName?: string;
 }
 
 export interface ApprovalStageRecord {
@@ -142,6 +152,36 @@ export interface IdeaScorecard {
   scoredBy?: string;     // systemuser GUID (afp_scoredby lookup)
   scoredByName?: string; // expanded systemuser fullname
   scoredOn?: string;     // ISO 8601
+}
+
+/**
+ * Maps to the Dataverse `afp_scorecardweight` table — one row per scorecard
+ * dimension holding its configurable percentage weight. The five weights are
+ * expected to sum to 100. When the table is empty the app falls back to the
+ * code-default weights in `SCORECARD_DIMENSIONS`.
+ */
+export interface ScorecardWeight {
+  id: string;                      // afp_scorecardweightid
+  dimensionKey: ScorecardDimensionKey; // afp_dimensionkey
+  label: string;                   // afp_name (display label)
+  weight: number;                  // afp_weight (0–100)
+}
+
+/** Outcome rating choice values mirroring the afp_outcomerating option set. */
+export type IdeaOutcomeRating = 747150000 | 747150001 | 747150002 | 747150003;
+
+/**
+ * Post-approval realized outcomes for a submitted idea. Has a 1:1 relationship
+ * with the idea submission (one record per submission, enforced by the app).
+ * Maps to the Dataverse `afp_idearealization` table.
+ */
+export interface IdeaRealization {
+  id: string;
+  submissionId: string;
+  actualMonthlyCost?: number;
+  realizedBenefit?: string;
+  actualGoLiveDate?: string; // ISO 8601 (date only)
+  outcomeRating?: IdeaOutcomeRating;
 }
 
 /**

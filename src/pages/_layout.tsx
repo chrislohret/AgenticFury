@@ -1,6 +1,7 @@
 import { Outlet, NavLink } from "react-router-dom"
 import { cn } from "@/lib/utils"
 import { ThemeSelector } from "@/components/theme-selector"
+import { useIsCoeAdmin } from "@/hooks/useCurrentUser"
 
 const navSections = [
   {
@@ -12,16 +13,28 @@ const navSections = [
     ],
   },
   {
-    title: "Admin",
+    title: "Review",
+    adminOnly: true,
     items: [
+      { to: "/my-approvals", label: "My Approvals" },
+    ],
+  },
+  {
+    title: "Admin",
+    adminOnly: true,
+    items: [
+      { to: "/analytics", label: "Analytics" },
       { to: "/ai-coe-team", label: "AI CoE Team" },
       { to: "/coe-roles", label: "AI CoE Roles" },
-      { to: "/lookup-tables", label: "Lookup Tables" },
+      { to: "/scorecard-config", label: "Scorecard Configuration" },
+      { to: "/lookup-tables", label: "Normalized Idea Configuration" },
     ],
   },
 ]
 
 export default function Layout() {
+  const { isAdmin } = useIsCoeAdmin()
+  const visibleSections = navSections.filter((s) => !s.adminOnly || isAdmin)
   return (
     <div className="min-h-dvh flex flex-col">
       <header className="h-14 shrink-0 border-b flex items-center justify-between px-4">
@@ -31,7 +44,7 @@ export default function Layout() {
       <div className="flex flex-1 min-h-0">
         <aside className="w-52 shrink-0 border-r flex flex-col">
           <nav className="flex-1 p-3 space-y-1">
-            {navSections.map((section, sectionIndex) => (
+            {visibleSections.map((section, sectionIndex) => (
               <div
                 key={section.title}
                 className={cn(

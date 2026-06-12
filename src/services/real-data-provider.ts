@@ -4,7 +4,8 @@ import { getClient } from '@microsoft/power-apps/data';
 import { dataSourcesInfo } from '../../.power/schemas/appschemas/dataSourcesInfo';
 import { MicrosoftDataverseService } from '@/generated/services/MicrosoftDataverseService';
 import { IDEA_STATUS, IDEA_STATUS_STATECODE, IDEA_STATE } from '@/constants/ideaStatus';
-import { computeWeightedTotal } from '@/lib/scorecard';
+import { SCORECARD_DIMENSIONS, type ScorecardDimensionKey } from '@/constants/scorecard';
+import { computeWeightedTotal, weightsListToMap, type ScorecardWeightMap } from '@/lib/scorecard';
 import { getFieldMetadata } from '@/services/field-metadata-cache';
 import type { AppDataProvider } from '@/services/data-contracts';
 import type {
@@ -17,6 +18,8 @@ import type {
   CoeNote,
   CoeStructuredReview,
   IdeaScorecard,
+  IdeaRealization,
+  ScorecardWeight,
   DirectoryUser,
   IdeaSubmission,
   LookupCategory,
@@ -37,6 +40,8 @@ const TABLES = {
   structuredReview: 'afp_coestructuredreviews',
   structuredReviewSelection: 'afp_coestructuredreviewselections',
   scorecard: 'afp_ideascorecards',
+  scorecardWeight: 'afp_scorecardweights',
+  realization: 'afp_idearealizations',
   approvalHistory: 'afp_approvalhistoryentries',
   aiCoeRole: 'afp_aicoeroleses',
   teamMember: 'afp_aicoeteammembers',
@@ -183,6 +188,16 @@ function normalizeNumber(value: unknown): number | undefined {
 
 function normalizeDate(value: unknown): string | undefined {
   return typeof value === 'string' && value ? value : undefined;
+}
+
+/** Splits a comma-joined denormalized text column into a trimmed, de-duplicated list. */
+function splitCsv(value: unknown): string[] | undefined {
+  if (typeof value !== 'string') return undefined;
+  const parts = value
+    .split(',')
+    .map((part) => part.trim())
+    .filter((part) => part.length > 0);
+  return parts.length > 0 ? Array.from(new Set(parts)) : undefined;
 }
 
 function normalizeBoolean(value: unknown): boolean {
@@ -410,6 +425,7 @@ function getRecordGuid(record: DataverseRecord): string {
       record.afp_coestructuredreviewid ??
       record.afp_coestructuredreviewselectionid ??
       record.afp_ideascorecardid ??
+      record.afp_scorecardweightid ??
       record.afp_approvalhistoryentryid ??
       record.afp_aicoeteammemberid ??
       record.afp_aicoeteamapprovalid ??
@@ -474,8 +490,12 @@ function mapIdeaSubmission(record: DataverseRecord, imageUrl?: string, pdfUrl?: 
     aiPlatformSelection: normalizeNumber(safeRecord.afp_aiplatformselection),
     status: mapIdeaStatus(safeRecord.statuscode),
     department: normalizeText(safeRecord.afp_department) || undefined,
+    normalizedDepartments: splitCsv(safeRecord.afp_aicoedepartments),
     submittedBy: normalizeId(createdBy?.systemuserid ?? createdBy?.id ?? safeRecord._createdby_value ?? safeRecord.createdby_value) || undefined,
     createdOn: normalizeDate(safeRecord.createdon),
+    assignedReviewer: normalizeId(safeRecord._afp_assignedreviewer_value) || undefined,
+    assignedReviewerName:
+      normalizeText(safeRecord['_afp_assignedreviewer_value@OData.Community.Display.V1.FormattedValue']) || undefined,
   };
 }
 
@@ -603,6 +623,51 @@ function mapScorecard(record: DataverseRecord): IdeaScorecard {
   };
 }
 
+function mapScorecardWeight(record: DataverseRecord): ScorecardWeight {
+  return {
+    id: getRecordGuid(record),
+    dimensionKey: normalizeText(record.afp_dimensionkey) as ScorecardDimensionKey,
+    label: normalizeText(record.afp_name),
+    weight: normalizeNumber(record.afp_weight) ?? 0,
+  };
+}
+
+function mapRealization(record: DataverseRecord): IdeaRealization {
+  const rating = normalizeNumber(record.afp_outcomerating);
+  return {
+    id: getRecordGuid(record),
+    submissionId: normalizeId(record._afp_submissionid_value ?? record.afp_submissionid) || '',
+    actualMonthlyCost: normalizeNumber(record.afp_actualmonthlycost),
+    realizedBenefit: normalizeText(record.afp_realizedbenefit) || undefined,
+    actualGoLiveDate: normalizeDate(record.afp_actualgolivedate) || undefined,
+    outcomeRating: rating === undefined ? undefined : (rating as IdeaRealization['outcomeRating']),
+  };
+}
+
+async function listScorecardWeightRows(): Promise<ScorecardWeight[]> {
+  const rows = await listRows(
+    TABLES.scorecardWeight,
+    selectFields(['afp_scorecardweightid', 'afp_name', 'afp_dimensionkey', 'afp_weight']),
+  );
+  return rows
+    .map(mapScorecardWeight)
+    .filter((row) => SCORECARD_DIMENSIONS.some((d) => d.key === row.dimensionKey));
+}
+
+/**
+ * Loads the configured per-dimension weights for use in the weighted-total
+ * calculation. Falls back to the code defaults when the table is empty or a
+ * read fails so scoring never breaks if weights are unconfigured.
+ */
+async function loadScorecardWeightMap(): Promise<ScorecardWeightMap | undefined> {
+  try {
+    const rows = await listScorecardWeightRows();
+    return rows.length ? weightsListToMap(rows) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 async function loadCurrentUserName(): Promise<string> {
   const context = await getCurrentUserContext();
   return context?.fullName || 'Current user';
@@ -621,6 +686,7 @@ async function listIdeaRecords(): Promise<DataverseRecord[]> {
       'afp_expectedoutcomes',
       'afp_riskfactors',
       'afp_department',
+      'afp_aicoedepartments',
       'afp_monthlycopilotcreditscost',
       'afp_monthlycopilotcreditsnotes',
       'afp_userbasedlicensingcost',
@@ -633,6 +699,7 @@ async function listIdeaRecords(): Promise<DataverseRecord[]> {
       'createdon',
       'createdby',
       '_createdby_value',
+      '_afp_assignedreviewer_value',
     ]),
     'createdby($select=systemuserid,fullname,internalemailaddress)',
   );
@@ -652,6 +719,7 @@ async function getIdeaRecordById(id: string): Promise<DataverseRecord | null> {
       'afp_expectedoutcomes',
       'afp_riskfactors',
       'afp_department',
+      'afp_aicoedepartments',
       'afp_estimatedcostsimage',
       'afp_copilotcreditestimatorpdf_name',
       'afp_monthlycopilotcreditscost',
@@ -666,6 +734,7 @@ async function getIdeaRecordById(id: string): Promise<DataverseRecord | null> {
       'createdon',
       'createdby',
       '_createdby_value',
+      '_afp_assignedreviewer_value',
     ]),
     'createdby($select=systemuserid,fullname,internalemailaddress)',
   );
@@ -781,6 +850,12 @@ export function createRealDataProvider(): AppDataProvider {
           // (Approved/Rejected/Completed) persist instead of silently reverting.
           statecode: IDEA_STATUS_STATECODE[statusValue] ?? IDEA_STATE.ACTIVE,
         };
+
+        // Assigned reviewer is a systemuser lookup; only bind it when the caller
+        // supplies a reviewer so unrelated saves don't disturb the assignment.
+        if (input.assignedReviewer) {
+          body['afp_AssignedReviewer@odata.bind'] = `/${TABLES.systemUser}(${input.assignedReviewer})`;
+        }
 
         await upsertRow(TABLES.idea, id, body);
 
@@ -909,6 +984,29 @@ export function createRealDataProvider(): AppDataProvider {
       async delete(id: string) {
         await MicrosoftDataverseService.DeleteRecordWithOrganization(ORG_URL, TABLES.lookupOption, id);
       },
+      async getUsageCounts() {
+        // Each selection row links one structured review (≈ one submission) to
+        // one lookup option, so counting rows per optionid gives the number of
+        // normalized records referencing each option.
+        const selections = await listRows(
+          TABLES.structuredReviewSelection,
+          selectFields(['afp_coestructuredreviewselectionid', 'afp_optionid', '_afp_reviewid_value']),
+        );
+        const counts: Record<string, number> = {};
+        const seen = new Set<string>();
+        for (const selection of selections) {
+          const optionId = normalizeId(selection.afp_optionid);
+          const reviewId = normalizeId(selection._afp_reviewid_value ?? selection.afp_reviewid);
+          if (!optionId) continue;
+          // De-duplicate per (review, option) so a single review can't inflate
+          // the count for the same option more than once.
+          const key = `${reviewId}:${optionId}`;
+          if (seen.has(key)) continue;
+          seen.add(key);
+          counts[optionId] = (counts[optionId] ?? 0) + 1;
+        }
+        return counts;
+      },
     },
     coeStructuredReviews: {
       async getBySubmissionId(submissionId: string) {
@@ -1027,13 +1125,17 @@ export function createRealDataProvider(): AppDataProvider {
         const trustGovernanceScore = input.trustGovernanceScore ?? existing?.trustGovernanceScore;
         const technicalPerformanceScore = input.technicalPerformanceScore ?? existing?.technicalPerformanceScore;
 
-        const weightedTotal = computeWeightedTotal({
-          businessValue: businessValueScore,
-          efficiency: efficiencyScore,
-          adoption: adoptionScore,
-          trustGovernance: trustGovernanceScore,
-          technicalPerformance: technicalPerformanceScore,
-        });
+        const weightMap = await loadScorecardWeightMap();
+        const weightedTotal = computeWeightedTotal(
+          {
+            businessValue: businessValueScore,
+            efficiency: efficiencyScore,
+            adoption: adoptionScore,
+            trustGovernance: trustGovernanceScore,
+            technicalPerformance: technicalPerformanceScore,
+          },
+          weightMap,
+        );
 
         const scoredOn = input.scoredOn ?? new Date().toISOString();
         const scorerId = await getCurrentSystemUserId();
@@ -1081,6 +1183,39 @@ export function createRealDataProvider(): AppDataProvider {
           scoredByName,
           scoredOn,
         } satisfies IdeaScorecard;
+      },
+    },
+    scorecardWeights: {
+      async list(): Promise<ScorecardWeight[]> {
+        const rows = await listScorecardWeightRows();
+        // Order by the canonical dimension order so the admin page is stable.
+        return SCORECARD_DIMENSIONS.map((dimension) => {
+          const match = rows.find((row) => row.dimensionKey === dimension.key);
+          return (
+            match ?? {
+              id: '',
+              dimensionKey: dimension.key,
+              label: dimension.label,
+              weight: dimension.weight,
+            }
+          );
+        });
+      },
+      async saveWeights(weights) {
+        const existing = await listScorecardWeightRows();
+        const byKey = new Map(existing.map((row) => [row.dimensionKey, row]));
+        for (const entry of weights) {
+          const dimension = SCORECARD_DIMENSIONS.find((d) => d.key === entry.dimensionKey);
+          const current = byKey.get(entry.dimensionKey);
+          const id = current?.id || crypto.randomUUID();
+          const body: DataverseRecord = {
+            afp_name: dimension?.label ?? entry.dimensionKey,
+            afp_dimensionkey: entry.dimensionKey,
+            afp_weight: entry.weight,
+          };
+          await upsertRow(TABLES.scorecardWeight, id, body);
+        }
+        return this.list();
       },
     },
     coeNotes: {
@@ -1315,6 +1450,46 @@ export function createRealDataProvider(): AppDataProvider {
       },
       async delete(id: string) {
         await MicrosoftDataverseService.DeleteRecordWithOrganization(ORG_URL, TABLES.teamApproval, id);
+      },
+    },
+    ideaRealizations: {
+      async getBySubmissionId(submissionId: string) {
+        const rows = await listRows(
+          TABLES.realization,
+          selectFields([
+            'afp_idearealizationid',
+            '_afp_submissionid_value',
+            'afp_actualmonthlycost',
+            'afp_realizedbenefit',
+            'afp_actualgolivedate',
+            'afp_outcomerating',
+          ]),
+        );
+        const record = rows.find(
+          (row) => normalizeId(row._afp_submissionid_value ?? row.afp_submissionid) === submissionId,
+        );
+        return record ? mapRealization(record) : null;
+      },
+      async save(input: Partial<IdeaRealization> & { submissionId: string }) {
+        const existing = await this.getBySubmissionId(input.submissionId);
+        const id = existing?.id ?? input.id ?? crypto.randomUUID();
+        const body: DataverseRecord = {
+          afp_name: `Realization - ${input.submissionId}`,
+          'afp_SubmissionId@odata.bind': `/${TABLES.idea}(${input.submissionId})`,
+          afp_actualmonthlycost: input.actualMonthlyCost ?? existing?.actualMonthlyCost ?? null,
+          afp_realizedbenefit: input.realizedBenefit ?? existing?.realizedBenefit ?? null,
+          afp_actualgolivedate: input.actualGoLiveDate ?? existing?.actualGoLiveDate ?? null,
+          afp_outcomerating: input.outcomeRating ?? existing?.outcomeRating ?? null,
+        };
+        await upsertRow(TABLES.realization, id, body);
+        return {
+          id,
+          submissionId: input.submissionId,
+          actualMonthlyCost: input.actualMonthlyCost ?? existing?.actualMonthlyCost,
+          realizedBenefit: input.realizedBenefit ?? existing?.realizedBenefit,
+          actualGoLiveDate: input.actualGoLiveDate ?? existing?.actualGoLiveDate,
+          outcomeRating: input.outcomeRating ?? existing?.outcomeRating,
+        } satisfies IdeaRealization;
       },
     },
     directoryUsers: {

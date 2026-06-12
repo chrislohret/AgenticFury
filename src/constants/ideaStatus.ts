@@ -55,3 +55,32 @@ export const IDEA_STATUS_BADGE_VARIANT: Record<number, BadgeVariant> = {
   [IDEA_STATUS.IN_PROGRESS]: 'default',
   [IDEA_STATUS.COMPLETED]: 'secondary',
 };
+
+// Allowed lifecycle transitions. A status may only move to one of the values
+// listed for its current state (in addition to staying on itself). This keeps
+// the workflow coherent — e.g. an idea cannot jump straight from Draft to
+// Completed. The status selector on the submission detail page is constrained
+// to these options.
+export const LIFECYCLE_TRANSITIONS: Record<number, number[]> = {
+  [IDEA_STATUS.DRAFT]: [IDEA_STATUS.SUBMITTED],
+  [IDEA_STATUS.SUBMITTED]: [IDEA_STATUS.UNDER_REVIEW, IDEA_STATUS.ON_HOLD, IDEA_STATUS.REJECTED],
+  [IDEA_STATUS.UNDER_REVIEW]: [
+    IDEA_STATUS.APPROVED,
+    IDEA_STATUS.REJECTED,
+    IDEA_STATUS.ON_HOLD,
+  ],
+  [IDEA_STATUS.ON_HOLD]: [IDEA_STATUS.UNDER_REVIEW, IDEA_STATUS.SUBMITTED, IDEA_STATUS.REJECTED],
+  [IDEA_STATUS.APPROVED]: [IDEA_STATUS.IN_PROGRESS, IDEA_STATUS.ON_HOLD],
+  [IDEA_STATUS.IN_PROGRESS]: [IDEA_STATUS.COMPLETED, IDEA_STATUS.ON_HOLD],
+  [IDEA_STATUS.REJECTED]: [IDEA_STATUS.UNDER_REVIEW],
+  [IDEA_STATUS.COMPLETED]: [IDEA_STATUS.IN_PROGRESS],
+};
+
+/**
+ * Returns the selectable statuses for a record currently in `status`: the
+ * current status itself plus every allowed forward/backward transition.
+ */
+export function getAllowedStatusOptions(status: number): number[] {
+  const next = LIFECYCLE_TRANSITIONS[status] ?? [];
+  return [status, ...next.filter((s) => s !== status)];
+}

@@ -10,6 +10,144 @@
       "x-ms-dataverse-primary-id": "afp_idearequirementid",
       "x-ms-dataverse-primary-name": "afp_title",
       "properties": {
+        "afp_aicoebusinessobjectives": {
+          "type": "string",
+          "title": "AI CoE Business Objectives",
+          "x-ms-dataverse-attribute": "afp_aicoebusinessobjectives",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "afp_AICoEBusinessObjectives",
+          "maxLength": 200
+        },
+        "afp_aicoedatasources": {
+          "type": "string",
+          "title": "AI CoE Data Sources",
+          "x-ms-dataverse-attribute": "afp_aicoedatasources",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "afp_AICoEDataSources",
+          "maxLength": 200
+        },
+        "afp_aicoedepartments": {
+          "type": "string",
+          "title": "AI CoE Departments",
+          "x-ms-dataverse-attribute": "afp_aicoedepartments",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "afp_AICoEDepartments",
+          "maxLength": 200
+        },
+        "afp_aicoeexpectedoutcomes": {
+          "type": "string",
+          "title": "AI CoE Expected Outcomes",
+          "x-ms-dataverse-attribute": "afp_aicoeexpectedoutcomes",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "afp_AICoEExpectedOutcomes",
+          "maxLength": 200
+        },
+        "afp_aicoeintendedusers": {
+          "type": "string",
+          "title": "AI CoE Intended Users",
+          "x-ms-dataverse-attribute": "afp_aicoeintendedusers",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "afp_AICoEIntendedUsers",
+          "maxLength": 200
+        },
+        "afp_aicoeriskfactors": {
+          "type": "string",
+          "title": "AI CoE  Risk Factors",
+          "x-ms-dataverse-attribute": "afp_aicoeriskfactors",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "afp_AICoERiskFactors",
+          "maxLength": 200
+        },
+        "afp_aiplatformselection": {
+          "type": "string",
+          "title": "AI Platform Selection",
+          "x-ms-dataverse-attribute": "afp_aiplatformselection",
+          "x-ms-dataverse-type": "PicklistType",
+          "x-ms-schema-name": "afp_AIPlatformSelection",
+          "enum": [
+            "Agent Builder",
+            "Copilot Studio",
+            "Azure AI Foundry"
+          ],
+          "x-ms-enum-values": [
+            747150000,
+            747150001,
+            747150002
+          ],
+          "Color": [
+            null,
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "382d1dbb-dd64-f111-ab0d-00224805fec9",
+          "x-ms-isGlobal": true,
+          "x-ms-optionsetdisplayname": "AI Platforms",
+          "x-ms-optionSetType": "Picklist"
+        },
+        "afp_aiplatformselectionname": {
+          "type": "string",
+          "title": "afp_aiplatformselectionname",
+          "x-ms-dataverse-attribute": "afp_aiplatformselectionname",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "afp_aiplatformselectionName",
+          "x-ms-read-only": true
+        },
+        "afp_approvalstatus": {
+          "type": "string",
+          "title": "Approval Decision",
+          "x-ms-dataverse-attribute": "afp_approvalstatus",
+          "x-ms-dataverse-type": "PicklistType",
+          "x-ms-schema-name": "afp_ApprovalStatus",
+          "enum": [
+            "Approved",
+            "Denied"
+          ],
+          "x-ms-enum-values": [
+            100000000,
+            100000001
+          ],
+          "Color": [
+            null,
+            null
+          ],
+          "x-ms-optionsetmetadataid": "3eabf4ca-8f5f-f111-a826-00224805f97f",
+          "x-ms-isGlobal": true,
+          "x-ms-optionsetdisplayname": "Approval Decision",
+          "x-ms-optionSetType": "Picklist"
+        },
+        "afp_approvalstatusname": {
+          "type": "string",
+          "title": "afp_approvalstatusname",
+          "x-ms-dataverse-attribute": "afp_approvalstatusname",
+          "x-ms-dataverse-type": "VirtualType",
+          "x-ms-schema-name": "afp_approvalstatusName",
+          "x-ms-read-only": true
+        },
+        "afp_assignedreviewer": {
+          "type": "string",
+          "title": "Assigned Reviewer",
+          "x-ms-dataverse-attribute": "afp_assignedreviewer",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "afp_AssignedReviewer"
+        },
+        "afp_assignedreviewername": {
+          "type": "string",
+          "title": "afp_assignedreviewername",
+          "x-ms-dataverse-attribute": "afp_assignedreviewername",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "afp_AssignedReviewerName",
+          "x-ms-read-only": true,
+          "maxLength": 200
+        },
+        "afp_assignedrevieweryominame": {
+          "type": "string",
+          "title": "afp_assignedrevieweryominame",
+          "x-ms-dataverse-attribute": "afp_assignedrevieweryominame",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "afp_AssignedReviewerYomiName",
+          "x-ms-read-only": true,
+          "maxLength": 200
+        },
         "afp_businessobjectives": {
           "type": "string",
           "title": "Business Objectives",
@@ -19,13 +157,37 @@
           "required": true,
           "maxLength": 4000
         },
+        "afp_copilotcreditestimatorpdf": {
+          "type": "string",
+          "title": "Copilot Credit Estimator PDF",
+          "x-ms-dataverse-attribute": "afp_copilotcreditestimatorpdf",
+          "x-ms-dataverse-type": "FileType",
+          "x-ms-schema-name": "afp_CopilotCreditEstimatorPDF",
+          "x-ms-read-only": true
+        },
+        "afp_copilotcreditestimatorpdf_name": {
+          "type": "string",
+          "title": "afp_copilotcreditestimatorpdf_name",
+          "x-ms-dataverse-attribute": "afp_copilotcreditestimatorpdf_name",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "afp_CopilotCreditEstimatorPDF_Name",
+          "x-ms-read-only": true,
+          "maxLength": 200
+        },
         "afp_datasourcecost": {
           "type": "string",
           "title": "Data Source Cost",
           "x-ms-dataverse-attribute": "afp_datasourcecost",
-          "x-ms-dataverse-type": "StringType",
-          "x-ms-schema-name": "afp_DataSourceCost",
-          "maxLength": 100
+          "x-ms-dataverse-type": "MoneyType",
+          "x-ms-schema-name": "afp_DataSourceCost"
+        },
+        "afp_datasourcecost_base": {
+          "type": "string",
+          "title": "Data Source Cost (Base)",
+          "x-ms-dataverse-attribute": "afp_datasourcecost_base",
+          "x-ms-dataverse-type": "MoneyType",
+          "x-ms-schema-name": "afp_datasourcecost_Base",
+          "x-ms-read-only": true
         },
         "afp_datasourcenotes": {
           "type": "string",
@@ -115,9 +277,16 @@
           "type": "string",
           "title": "Monthly Copilot Credits Cost",
           "x-ms-dataverse-attribute": "afp_monthlycopilotcreditscost",
-          "x-ms-dataverse-type": "StringType",
-          "x-ms-schema-name": "afp_MonthlyCopilotCreditsCost",
-          "maxLength": 100
+          "x-ms-dataverse-type": "MoneyType",
+          "x-ms-schema-name": "afp_MonthlyCopilotCreditsCost"
+        },
+        "afp_monthlycopilotcreditscost_base": {
+          "type": "string",
+          "title": "Monthly Copilot Credits Cost (Base)",
+          "x-ms-dataverse-attribute": "afp_monthlycopilotcreditscost_base",
+          "x-ms-dataverse-type": "MoneyType",
+          "x-ms-schema-name": "afp_monthlycopilotcreditscost_Base",
+          "x-ms-read-only": true
         },
         "afp_monthlycopilotcreditsnotes": {
           "type": "string",
@@ -187,9 +356,16 @@
           "type": "string",
           "title": "User Based Licensing Cost",
           "x-ms-dataverse-attribute": "afp_userbasedlicensingcost",
-          "x-ms-dataverse-type": "StringType",
-          "x-ms-schema-name": "afp_UserBasedLicensingCost",
-          "maxLength": 100
+          "x-ms-dataverse-type": "MoneyType",
+          "x-ms-schema-name": "afp_UserBasedLicensingCost"
+        },
+        "afp_userbasedlicensingcost_base": {
+          "type": "string",
+          "title": "User Based Licensing Cost (Base)",
+          "x-ms-dataverse-attribute": "afp_userbasedlicensingcost_base",
+          "x-ms-dataverse-type": "MoneyType",
+          "x-ms-schema-name": "afp_userbasedlicensingcost_Base",
+          "x-ms-read-only": true
         },
         "afp_userbasedlicensingnotes": {
           "type": "string",
@@ -260,6 +436,14 @@
           "x-ms-read-only": true,
           "required": true,
           "maxLength": 100
+        },
+        "exchangerate": {
+          "type": "string",
+          "title": "Exchange Rate",
+          "x-ms-dataverse-attribute": "exchangerate",
+          "x-ms-dataverse-type": "DecimalType",
+          "x-ms-schema-name": "ExchangeRate",
+          "x-ms-read-only": true
         },
         "importsequencenumber": {
           "type": "string",
@@ -500,6 +684,22 @@
           "x-ms-dataverse-attribute": "timezoneruleversionnumber",
           "x-ms-dataverse-type": "IntegerType",
           "x-ms-schema-name": "TimeZoneRuleVersionNumber"
+        },
+        "transactioncurrencyid": {
+          "type": "string",
+          "title": "Currency",
+          "x-ms-dataverse-attribute": "transactioncurrencyid",
+          "x-ms-dataverse-type": "LookupType",
+          "x-ms-schema-name": "TransactionCurrencyId"
+        },
+        "transactioncurrencyidname": {
+          "type": "string",
+          "title": "transactioncurrencyidname",
+          "x-ms-dataverse-attribute": "transactioncurrencyidname",
+          "x-ms-dataverse-type": "StringType",
+          "x-ms-schema-name": "TransactionCurrencyIdName",
+          "x-ms-read-only": true,
+          "maxLength": 100
         },
         "utcconversiontimezonecode": {
           "type": "string",

@@ -3565,6 +3565,13 @@ export const dataSourcesInfo = {
     "dataSourceType": "Dataverse",
     "apis": {}
   },
+  "afp_idearealizations": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "afp_idearealizationid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
   "afp_idearequirements": {
     "tableId": "",
     "version": "",
@@ -3583,6 +3590,13 @@ export const dataSourcesInfo = {
     "tableId": "",
     "version": "",
     "primaryKey": "afp_lookupoptionid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
+  "afp_scorecardweights": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "afp_scorecardweightid",
     "dataSourceType": "Dataverse",
     "apis": {}
   },

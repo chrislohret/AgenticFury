@@ -4,10 +4,13 @@ import Layout from "@/pages/_layout"
 import DashboardPage from "@/pages/dashboard"
 import SubmitIdeaPage from "@/pages/submit-idea"
 import MySubmissionsPage from "@/pages/my-submissions"
+import MyApprovalsPage from "@/pages/my-approvals"
+import AnalyticsPage from "@/pages/analytics"
 import SubmissionDetailPage from "@/pages/submission-detail"
 import ScorecardPage from "@/pages/scorecard"
 import LookupTablesPage from "@/pages/lookup-tables"
 import CoeRolesPage from "@/pages/coe-roles"
+import ScorecardConfigPage from "@/pages/scorecard-config"
 import AiCoeTeamPage from "@/pages/ai-coe-team"
 import NotFoundPage from "@/pages/not-found"
 
@@ -35,8 +38,11 @@ export const router = createHashRouter([
       { path: "submit", element: <SubmitIdeaPage /> },
       { path: "submit/:id", element: <SubmitIdeaPage /> },
       { path: "my-ideas", element: <MySubmissionsPage /> },
+      { path: "my-approvals", element: <MyApprovalsPage /> },
+      { path: "analytics", element: <AnalyticsPage /> },
       { path: "lookup-tables", element: <LookupTablesPage /> },
       { path: "coe-roles", element: <CoeRolesPage /> },
+      { path: "scorecard-config", element: <ScorecardConfigPage /> },
       { path: "ai-coe-team", element: <AiCoeTeamPage /> },
       { path: "submissions/:id", element: <SubmissionDetailPage /> },
       { path: "submissions/:id/scorecard", element: <ScorecardPage /> },

@@ -1,7 +1,9 @@
 // Scorecard rubric for evaluating a submitted idea across five weighted
 // dimensions. Each dimension is scored 0–5; the weights below sum to 100 and
-// drive the weighted total (see src/lib/scorecard.ts). Weights live in code —
-// they are an app-level policy decision, not Dataverse data.
+// drive the weighted total (see src/lib/scorecard.ts). These weights are the
+// app-level DEFAULTS — admins can override them via the Scorecard Configuration
+// page (stored in the afp_scorecardweight Dataverse table). When that table is
+// empty the app falls back to the defaults defined here.
 
 export type ScorecardDimensionKey =
   | 'businessValue'
@@ -114,3 +116,50 @@ export const SCORECARD_DIMENSIONS: ScorecardDimension[] = [
     ],
   },
 ];
+
+/**
+ * Decision bands applied to a scorecard's 0–100 weighted total. They turn the
+ * numeric score into an actionable recommendation. Bands are evaluated
+ * top-to-bottom by descending `min`, so the first band whose `min` the total
+ * meets or exceeds wins. These are app-level defaults.
+ */
+export interface ScoreBand {
+  key: 'recommend' | 'conditional' | 'decline';
+  label: string;
+  /** Inclusive lower bound on the 0–100 weighted total. */
+  min: number;
+  badgeVariant: 'default' | 'secondary' | 'destructive';
+  description: string;
+}
+
+export const SCORE_BANDS: ScoreBand[] = [
+  {
+    key: 'recommend',
+    label: 'Recommended for Approval',
+    min: 75,
+    badgeVariant: 'default',
+    description: 'Strong across dimensions — recommended to approve.',
+  },
+  {
+    key: 'conditional',
+    label: 'Conditional',
+    min: 50,
+    badgeVariant: 'secondary',
+    description: 'Promising but needs conditions or follow-up before approval.',
+  },
+  {
+    key: 'decline',
+    label: 'Decline',
+    min: 0,
+    badgeVariant: 'destructive',
+    description: 'Below the bar — recommended to decline or rework.',
+  },
+];
+
+/**
+ * Returns the decision band for a weighted total, or null when no score exists.
+ */
+export function getScoreBand(total: number | undefined | null): ScoreBand | null {
+  if (typeof total !== 'number' || Number.isNaN(total)) return null;
+  return SCORE_BANDS.find((band) => total >= band.min) ?? null;
+}

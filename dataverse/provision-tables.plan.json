@@ -528,6 +528,44 @@
       ]
     },
     {
+      "schemaName": "afp_ScorecardWeight",
+      "displayName": "Scorecard Weight",
+      "displayCollectionName": "Scorecard Weights",
+      "logicalSingularName": "afp_scorecardweight",
+      "logicalPluralName": "afp_scorecardweights",
+      "entitySetName": "afp_scorecardweights",
+      "tableLogicalName": "afp_scorecardweights",
+      "description": "Configurable percentage weight for a single scorecard dimension. The five rows are expected to sum to 100.",
+      "ownership": "UserOwned",
+      "hasActivities": false,
+      "hasNotes": false,
+      "primaryName": {
+        "schemaName": "afp_Name",
+        "displayName": "Name",
+        "description": "Dimension display label",
+        "maxLength": 200
+      },
+      "columns": [
+        {
+          "schemaName": "afp_DimensionKey",
+          "displayName": "Dimension Key",
+          "logicalName": "afp_dimensionkey",
+          "type": "String",
+          "maxLength": 100,
+          "requiredLevel": "None"
+        },
+        {
+          "schemaName": "afp_Weight",
+          "displayName": "Weight",
+          "logicalName": "afp_weight",
+          "type": "WholeNumber",
+          "minValue": 0,
+          "maxValue": 100,
+          "requiredLevel": "None"
+        }
+      ]
+    },
+    {
       "schemaName": "afp_AiCoeTeamMember",
       "displayName": "AI CoE Team Member",
       "displayCollectionName": "AI CoE Team Members",

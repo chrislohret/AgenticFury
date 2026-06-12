@@ -12,6 +12,7 @@ import {
   useIdeaScorecard,
   useSaveIdeaScorecard,
   useAiCoeTeam,
+  useScorecardWeights,
 } from '@/hooks/usePrototypeData';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import {
@@ -19,9 +20,10 @@ import {
   SCORECARD_MAX_SCORE,
   SCORECARD_MAX_TOTAL,
   SCORECARD_MIN_SCORE,
+  getScoreBand,
   type ScorecardDimensionKey,
 } from '@/constants/scorecard';
-import { computeWeightedTotal, isScorecardComplete } from '@/lib/scorecard';
+import { computeWeightedTotal, isScorecardComplete, weightsListToMap } from '@/lib/scorecard';
 import { cn } from '@/lib/utils';
 
 type ScoreState = Partial<Record<ScorecardDimensionKey, number>>;
@@ -59,6 +61,7 @@ export default function ScorecardPage() {
   const { data: scorecard, isLoading: scorecardLoading } = useIdeaScorecard(id);
   const { data: currentUser } = useCurrentUser();
   const { data: team } = useAiCoeTeam();
+  const { data: scorecardWeights } = useScorecardWeights();
   const save = useSaveIdeaScorecard();
 
   const [scores, setScores] = useState<ScoreState>({});
@@ -94,7 +97,12 @@ export default function ScorecardPage() {
     );
   }, [currentUser, team]);
 
-  const liveTotal = useMemo(() => computeWeightedTotal(scores), [scores]);
+  const weightMap = useMemo(
+    () => (scorecardWeights && scorecardWeights.length ? weightsListToMap(scorecardWeights) : undefined),
+    [scorecardWeights],
+  );
+
+  const liveTotal = useMemo(() => computeWeightedTotal(scores, weightMap), [scores, weightMap]);
   const complete = isScorecardComplete(scores);
 
   function setScore(key: ScorecardDimensionKey, value: number) {
@@ -176,7 +184,7 @@ export default function ScorecardPage() {
           <p className="text-sm text-muted-foreground">{submission.title}</p>
         </div>
         <Card className="min-w-[220px]">
-          <CardContent className="flex flex-col items-center justify-center py-4">
+          <CardContent className="flex flex-col items-center justify-center gap-2 py-4">
             <span className="text-xs uppercase tracking-wide text-muted-foreground">
               Weighted Total
             </span>
@@ -186,6 +194,14 @@ export default function ScorecardPage() {
                 {' '}/ {SCORECARD_MAX_TOTAL}
               </span>
             </span>
+            {(() => {
+              const band = complete ? getScoreBand(liveTotal) : null;
+              return band ? (
+                <Badge variant={band.badgeVariant} title={band.description}>
+                  {band.label}
+                </Badge>
+              ) : null;
+            })()}
           </CardContent>
         </Card>
       </div>
@@ -200,12 +216,13 @@ export default function ScorecardPage() {
         {SCORECARD_DIMENSIONS.map((dimension) => {
           const selected = scores[dimension.key];
           const selectedRubric = dimension.rubric.find((level) => level.score === selected);
+          const weight = weightMap?.[dimension.key] ?? dimension.weight;
           return (
             <Card key={dimension.key}>
               <CardHeader className="pb-3">
                 <div className="flex items-center justify-between gap-2">
                   <CardTitle className="text-base">{dimension.label}</CardTitle>
-                  <Badge variant="secondary">Weight {dimension.weight}%</Badge>
+                  <Badge variant="secondary">Weight {weight}%</Badge>
                 </div>
                 <p className="text-sm text-muted-foreground">{dimension.description}</p>
               </CardHeader>

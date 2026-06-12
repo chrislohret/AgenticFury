@@ -8,9 +8,18 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { toast } from 'sonner';
 import {
   useLookupOptions,
+  useLookupOptionUsage,
   useSaveLookupOption,
   useDeleteLookupOption,
 } from '@/hooks/usePrototypeData';
@@ -41,8 +50,10 @@ const EMPTY_FORM: LookupFormState = {
 export default function LookupTablesPage() {
   const [category, setCategory] = useState<LookupCategory>('data-sources');
   const [form, setForm] = useState<LookupFormState>(EMPTY_FORM);
+  const [deleteTarget, setDeleteTarget] = useState<LookupOption | null>(null);
 
   const { data: options = [], isLoading } = useLookupOptions(category);
+  const { data: usageCounts = {} } = useLookupOptionUsage();
   const saveLookup = useSaveLookupOption();
   const deleteLookup = useDeleteLookupOption(category);
 
@@ -91,15 +102,32 @@ export default function LookupTablesPage() {
       if (form.id === id) {
         resetForm();
       }
+      setDeleteTarget(null);
     } catch {
       toast.error('Unable to delete lookup option.');
+    }
+  }
+
+  async function handleDeactivate(record: LookupOption) {
+    try {
+      await saveLookup.mutateAsync({
+        id: record.id,
+        category,
+        name: record.name,
+        description: record.description,
+        isActive: false,
+      });
+      toast.success('Lookup option deactivated.');
+      setDeleteTarget(null);
+    } catch {
+      toast.error('Unable to deactivate lookup option.');
     }
   }
 
   return (
     <div className="p-6 space-y-6">
       <div>
-        <h1 className="text-2xl font-semibold tracking-tight">Lookup Tables</h1>
+        <h1 className="text-2xl font-semibold tracking-tight">Normalized Idea Configuration</h1>
         <p className="text-sm text-muted-foreground mt-1">
           Maintain structured values used by AI CoE reviewers for multiselect intake fields.
         </p>
@@ -136,6 +164,7 @@ export default function LookupTablesPage() {
                     <TableRow>
                       <TableHead>Name</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Used by</TableHead>
                       <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
@@ -149,6 +178,9 @@ export default function LookupTablesPage() {
                           )}
                         </TableCell>
                         <TableCell>{option.isActive ? 'Active' : 'Inactive'}</TableCell>
+                        <TableCell className="text-right tabular-nums text-muted-foreground">
+                          {usageCounts[option.id] ?? 0}
+                        </TableCell>
                         <TableCell className="text-right space-x-2">
                           <Button variant="outline" size="sm" onClick={() => startEdit(option)}>
                             Edit
@@ -156,7 +188,7 @@ export default function LookupTablesPage() {
                           <Button
                             variant="destructive"
                             size="sm"
-                            onClick={() => handleDelete(option.id)}
+                            onClick={() => setDeleteTarget(option)}
                             disabled={deleteLookup.isPending}
                           >
                             Delete
@@ -214,6 +246,55 @@ export default function LookupTablesPage() {
           </CardContent>
         </Card>
       </div>
+
+      <Dialog open={Boolean(deleteTarget)} onOpenChange={(open) => { if (!open) setDeleteTarget(null); }}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Delete &ldquo;{deleteTarget?.name}&rdquo;?</DialogTitle>
+            <DialogDescription>
+              {deleteTarget && (usageCounts[deleteTarget.id] ?? 0) > 0 ? (
+                <>
+                  This value is referenced by{' '}
+                  <strong>
+                    {usageCounts[deleteTarget.id]} normalized{' '}
+                    {usageCounts[deleteTarget.id] === 1 ? 'record' : 'records'}
+                  </strong>
+                  . Deleting it is permanent &mdash; it will be removed from the picker and will
+                  no longer resolve to a name on those ideas. Deactivate it instead to hide it from
+                  new reviews while preserving existing records.
+                </>
+              ) : (
+                <>
+                  This value is not referenced by any normalized records yet. Deleting it is
+                  permanent. If you only want to retire it from future reviews, deactivate it
+                  instead.
+                </>
+              )}
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteTarget(null)}>
+              Cancel
+            </Button>
+            {deleteTarget?.isActive && (
+              <Button
+                variant="secondary"
+                onClick={() => deleteTarget && handleDeactivate(deleteTarget)}
+                disabled={saveLookup.isPending}
+              >
+                Deactivate instead
+              </Button>
+            )}
+            <Button
+              variant="destructive"
+              onClick={() => deleteTarget && handleDelete(deleteTarget.id)}
+              disabled={deleteLookup.isPending}
+            >
+              Delete permanently
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

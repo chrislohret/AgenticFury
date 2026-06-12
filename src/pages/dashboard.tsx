@@ -4,6 +4,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
+import { Input } from '@/components/ui/input';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { useIdeaSubmissions } from '@/hooks/usePrototypeData';
 import { IDEA_STATUS, IDEA_STATUS_LABELS, IDEA_STATUS_BADGE_VARIANT } from '@/constants/ideaStatus';
 
@@ -14,6 +22,8 @@ type DashboardFilter =
   | 'approved'
   | 'rejected'
   | 'phiFlagged';
+
+type SortKey = 'newest' | 'oldest' | 'title' | 'status';
 
 function StatusCard({
   label,
@@ -51,6 +61,8 @@ function StatusCard({
 export default function DashboardPage() {
   const { data: submissions, isLoading } = useIdeaSubmissions();
   const [activeFilter, setActiveFilter] = useState<DashboardFilter>('all');
+  const [search, setSearch] = useState('');
+  const [sortKey, setSortKey] = useState<SortKey>('newest');
 
   const counts = {
     total: submissions?.length ?? 0,
@@ -81,7 +93,35 @@ export default function DashboardPage() {
     }
   }, [submissions, activeFilter]);
 
-  const recent = filteredSubmissions.slice(0, 6);
+  const visibleSubmissions = useMemo(() => {
+    let list = [...filteredSubmissions];
+    const q = search.trim().toLowerCase();
+    if (q) {
+      list = list.filter(
+        (s) =>
+          s.title?.toLowerCase().includes(q) ||
+          s.department?.toLowerCase().includes(q),
+      );
+    }
+    switch (sortKey) {
+      case 'oldest':
+        list.sort((a, b) => (a.createdOn ?? '').localeCompare(b.createdOn ?? ''));
+        break;
+      case 'title':
+        list.sort((a, b) => (a.title ?? '').localeCompare(b.title ?? ''));
+        break;
+      case 'status':
+        list.sort((a, b) => a.status - b.status);
+        break;
+      case 'newest':
+      default:
+        list.sort((a, b) => (b.createdOn ?? '').localeCompare(a.createdOn ?? ''));
+    }
+    return list;
+  }, [filteredSubmissions, search, sortKey]);
+
+  const isNarrowed = Boolean(search.trim()) || activeFilter !== 'all';
+  const displayedSubmissions = isNarrowed ? visibleSubmissions : visibleSubmissions.slice(0, 6);
 
   function handleFilterClick(nextFilter: DashboardFilter) {
     setActiveFilter((current) => (current === nextFilter ? 'all' : nextFilter));
@@ -153,18 +193,44 @@ export default function DashboardPage() {
       )}
 
       <div>
-        <h2 className="text-lg font-semibold mb-3">Recent Submissions</h2>
+        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
+          <h2 className="text-lg font-semibold">
+            {isNarrowed ? 'Matching Submissions' : 'Recent Submissions'}
+          </h2>
+          <div className="flex items-center gap-2">
+            <Input
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search title or department…"
+              className="h-8 w-56"
+              aria-label="Search submissions by title or department"
+            />
+            <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
+              <SelectTrigger className="h-8 w-36" aria-label="Sort submissions">
+                <SelectValue />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="newest">Newest first</SelectItem>
+                <SelectItem value="oldest">Oldest first</SelectItem>
+                <SelectItem value="title">Title (A–Z)</SelectItem>
+                <SelectItem value="status">Status</SelectItem>
+              </SelectContent>
+            </Select>
+          </div>
+        </div>
         {isLoading ? (
           <div className="space-y-2">
             {Array.from({ length: 4 }).map((_, i) => (
               <Skeleton key={i} className="h-14 w-full" />
             ))}
           </div>
-        ) : recent.length === 0 ? (
-          <p className="text-sm text-muted-foreground">No submissions yet.</p>
+        ) : displayedSubmissions.length === 0 ? (
+          <p className="text-sm text-muted-foreground">
+            {isNarrowed ? 'No submissions match your search or filter.' : 'No submissions yet.'}
+          </p>
         ) : (
           <div className="rounded-md border divide-y">
-            {recent.map((submission) => (
+            {displayedSubmissions.map((submission) => (
               <Link
                 key={submission.id}
                 to={`/submissions/${submission.id}`}

@@ -12,7 +12,10 @@ import type {
   AiCoeRole,
   AiCoeTeamMember,
   AiCoeTeamApproval,
+  ScorecardWeight,
+  IdeaRealization,
 } from '@/types/domain-models';
+import type { ScorecardDimensionKey } from '@/constants/scorecard';
 
 export type DataverseFieldRequiredLevel = 'none' | 'recommended' | 'application' | 'system';
 
@@ -49,6 +52,12 @@ export interface LookupOptionRepository {
   listByCategory(category: LookupCategory): Promise<LookupOption[]>;
   save(input: Partial<LookupOption>): Promise<LookupOption>;
   delete(id: string): Promise<void>;
+  /**
+   * Returns a map of lookup option id → number of structured reviews that
+   * currently reference it. Used to warn before deleting an option that is in
+   * use by historical normalized records. Options absent from the map are unused.
+   */
+  getUsageCounts(): Promise<Record<string, number>>;
 }
 
 export interface CoeStructuredReviewRepository {
@@ -96,6 +105,18 @@ export interface AiCoeRoleRepository {
   delete(id: string): Promise<void>;
 }
 
+/**
+ * Configurable per-dimension scorecard weights (one row per dimension).
+ * `saveWeights` upserts every supplied dimension and returns the full set.
+ * The app validates that weights sum to 100 before calling `saveWeights`.
+ */
+export interface ScorecardWeightRepository {
+  list(): Promise<ScorecardWeight[]>;
+  saveWeights(
+    weights: { dimensionKey: ScorecardDimensionKey; weight: number }[],
+  ): Promise<ScorecardWeight[]>;
+}
+
 export interface AiCoeTeamRepository {
   list(): Promise<AiCoeTeamMember[]>;
   save(input: { id?: string; memberId: string; userName: string; userEmail: string; roleId: string }): Promise<AiCoeTeamMember>;
@@ -108,17 +129,28 @@ export interface AiCoeTeamApprovalRepository {
   delete(id: string): Promise<void>;
 }
 
+/**
+ * One realization record per submission (1:1). `save` upserts by submissionId.
+ * Captures post-approval realized outcomes (actual cost, benefit, go-live, rating).
+ */
+export interface IdeaRealizationRepository {
+  getBySubmissionId(submissionId: string): Promise<IdeaRealization | null>;
+  save(input: Partial<IdeaRealization> & { submissionId: string }): Promise<IdeaRealization>;
+}
+
 export interface AppDataProvider {
   ideaSubmissions: IdeaSubmissionRepository;
   approvalStages: ApprovalStageRepository;
   lookupOptions: LookupOptionRepository;
   coeStructuredReviews: CoeStructuredReviewRepository;
   ideaScorecards: IdeaScorecardRepository;
+  scorecardWeights: ScorecardWeightRepository;
   coeNotes: CoeNoteRepository;
   coeApprovalHistory: CoeApprovalHistoryRepository;
   aiCoeRoles: AiCoeRoleRepository;
   aiCoeTeam: AiCoeTeamRepository;
   aiCoeTeamApprovals: AiCoeTeamApprovalRepository;
+  ideaRealizations: IdeaRealizationRepository;
   directoryUsers: DirectoryUserRepository;
   fieldMetadata: FieldMetadataRepository;
 }

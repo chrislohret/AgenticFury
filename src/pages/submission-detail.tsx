@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, Link, useBlocker } from 'react-router-dom';
-import { ChevronDown, ChevronUp, Trash2, ChevronLeft, ChevronRight, ExternalLink, FileText } from 'lucide-react';
+import { ChevronDown, ChevronUp, Trash2, ChevronLeft, ChevronRight, ExternalLink, FileText, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -52,8 +52,12 @@ import {
   useAiCoeTeamApprovals,
   useSaveAiCoeTeamApproval,
   useDeleteAiCoeTeamApproval,
+  useIdeaRealization,
+  useSaveIdeaRealization,
 } from '@/hooks/usePrototypeData';
-import { IDEA_STATUS, IDEA_STATUS_LABELS, IDEA_STATUS_BADGE_VARIANT } from '@/constants/ideaStatus';
+import { IDEA_STATUS, IDEA_STATUS_LABELS, IDEA_STATUS_BADGE_VARIANT, getAllowedStatusOptions } from '@/constants/ideaStatus';
+import { getScoreBand } from '@/constants/scorecard';
+import { AI_PLATFORM_OPTIONS } from '@/constants/aiPlatform';
 import type {
   CoeStructuredReview,
   CoeNote,
@@ -61,8 +65,16 @@ import type {
   AiCoeTeamApproval,
   AiCoeTeamMember,
   LookupOption,
+  IdeaOutcomeRating,
 } from '@/types/domain-models';
 import { cn } from '@/lib/utils';
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet';
 
 interface StructuredFormState {
   businessObjectiveIds: string[];
@@ -81,17 +93,6 @@ const EMPTY_STRUCTURED_FORM: StructuredFormState = {
   riskFactorIds: [],
   departmentIds: [],
 };
-
-const IDEA_STATUS_OPTIONS = [
-  IDEA_STATUS.DRAFT,
-  IDEA_STATUS.SUBMITTED,
-  IDEA_STATUS.UNDER_REVIEW,
-  IDEA_STATUS.APPROVED,
-  IDEA_STATUS.REJECTED,
-  IDEA_STATUS.ON_HOLD,
-  IDEA_STATUS.IN_PROGRESS,
-  IDEA_STATUS.COMPLETED,
-] as const;
 
 interface OverallCostsFormState {
   monthlyCopilotCreditsCost: string;
@@ -151,12 +152,6 @@ const PLATFORM_SLIDES: { src: string; label: string }[] = [
 ];
 
 // ── AI platform selection (afp_aiplatformselection choice column) ───────────
-
-const AI_PLATFORM_OPTIONS: { value: number; label: string }[] = [
-  { value: 747150000, label: 'Agent Builder' },
-  { value: 747150001, label: 'Copilot Studio' },
-  { value: 747150002, label: 'Azure AI Foundry' },
-];
 
 // ── CoE Activity Notes (Dataverse `annotation` table) ──────────────────────
 
@@ -309,23 +304,26 @@ function DetailRow({ label, value }: { label: string; value?: string | boolean |
 }
 
 function CollapsibleSection({
+  id,
   title,
   subtitle,
-  defaultOpen = false,
+  open,
+  onToggle,
   children,
 }: {
+  id: string;
   title: string;
   subtitle?: string;
-  defaultOpen?: boolean;
+  open: boolean;
+  onToggle: (id: string) => void;
   children: React.ReactNode;
 }) {
-  const [open, setOpen] = useState(defaultOpen);
-
   return (
-    <section className="rounded-lg border bg-card">
+    <section id={id} className="scroll-mt-32 rounded-lg border bg-card">
       <button
         type="button"
-        onClick={() => setOpen((v) => !v)}
+        onClick={() => onToggle(id)}
+        aria-expanded={open}
         className="w-full px-4 py-3 flex items-start justify-between gap-3 text-left hover:bg-muted/30 transition-colors"
       >
         <div className="min-w-0">
@@ -431,6 +429,24 @@ function structuredFormKey(form: StructuredFormState) {
   ]);
 }
 
+const DETAIL_SECTIONS = [
+  { id: 'section-copilot', label: 'Copilot Assistant' },
+  { id: 'section-intake', label: 'Submitted Idea + Normalized Idea' },
+  { id: 'section-platform', label: 'Platform & Estimated Costs' },
+  { id: 'section-approvals', label: 'Approvals' },
+  { id: 'section-realization', label: 'Realized Outcomes' },
+] as const;
+
+// Realized outcomes are only relevant once an approved idea is being delivered.
+const REALIZATION_STATUSES: number[] = [IDEA_STATUS.IN_PROGRESS, IDEA_STATUS.COMPLETED];
+
+const OUTCOME_RATING_OPTIONS: { value: IdeaOutcomeRating; label: string }[] = [
+  { value: 747150000, label: 'Exceeded Expectations' },
+  { value: 747150001, label: 'Met Expectations' },
+  { value: 747150002, label: 'Below Expectations' },
+  { value: 747150003, label: 'Failed / Abandoned' },
+];
+
 export default function SubmissionDetailPage() {
   const { id } = useParams<{ id: string }>();
   const { data: submission, isLoading } = useIdeaSubmission(id);
@@ -443,11 +459,13 @@ export default function SubmissionDetailPage() {
   const { data: members = [], isLoading: membersLoading } = useAiCoeTeam(canLoadRelatedData);
   const { data: approvals = [], isLoading: approvalsLoading } = useAiCoeTeamApprovals(relatedSubmissionId);
   const { data: approvalHistory = [], isLoading: approvalHistoryLoading } = useCoeApprovalHistory(relatedSubmissionId);
+  const { data: realization } = useIdeaRealization(relatedSubmissionId);
   const saveStructuredReview = useSaveCoeStructuredReview();
   const createNote = useCreateCoeNote();
   const saveApproval = useSaveAiCoeTeamApproval();
   const deleteApproval = useDeleteAiCoeTeamApproval(relatedSubmissionId);
   const createApprovalHistory = useCreateCoeApprovalHistory();
+  const saveRealization = useSaveIdeaRealization();
 
   const [addApproverMemberId, setAddApproverMemberId] = useState<string>('');
 
@@ -463,6 +481,7 @@ export default function SubmissionDetailPage() {
   const [newNoteText, setNewNoteText] = useState('');
   const [approvalComments, setApprovalComments] = useState<Record<string, string>>({});
   const [selectedStatus, setSelectedStatus] = useState<number | null>(null);
+  const [statusChangeReason, setStatusChangeReason] = useState('');
   const [titleDraft, setTitleDraft] = useState('');
   const [platformCarouselOpen, setPlatformCarouselOpen] = useState(false);
   const [platformSlideIndex, setPlatformSlideIndex] = useState(0);
@@ -472,6 +491,52 @@ export default function SubmissionDetailPage() {
   const estimatedCostsFileInputRef = useRef<HTMLInputElement | null>(null);
   const [overallCostsForm, setOverallCostsForm] = useState<OverallCostsFormState>(EMPTY_OVERALL_COSTS_FORM);
   const [platformSelection, setPlatformSelection] = useState<string>('');
+  const [assignedReviewerId, setAssignedReviewerId] = useState<string>('');
+  const [realizationForm, setRealizationForm] = useState({
+    actualMonthlyCost: '',
+    realizedBenefit: '',
+    actualGoLiveDate: '',
+    outcomeRating: '',
+  });
+
+  const [openSections, setOpenSections] = useState<Record<string, boolean>>({
+    'section-copilot': false,
+    'section-intake': true,
+    'section-platform': false,
+    'section-approvals': false,
+    'section-realization': false,
+  });
+  const allSectionsOpen = DETAIL_SECTIONS.every((s) => openSections[s.id]);
+  const toggleSection = (sectionId: string) =>
+    setOpenSections((prev) => ({ ...prev, [sectionId]: !prev[sectionId] }));
+  const setAllSections = (open: boolean) =>
+    setOpenSections(Object.fromEntries(DETAIL_SECTIONS.map((s) => [s.id, open])));
+  const goToSection = (sectionId: string) => {
+    setOpenSections((prev) => ({ ...prev, [sectionId]: true }));
+    requestAnimationFrame(() => {
+      document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  };
+
+  const [activeSection, setActiveSection] = useState<string>(DETAIL_SECTIONS[0].id);
+  const [notesOpen, setNotesOpen] = useState(false);
+
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries
+          .filter((e) => e.isIntersecting)
+          .sort((a, b) => a.boundingClientRect.top - b.boundingClientRect.top);
+        if (visible[0]) setActiveSection(visible[0].target.id);
+      },
+      { rootMargin: '-140px 0px -55% 0px', threshold: 0 },
+    );
+    DETAIL_SECTIONS.forEach((s) => {
+      const el = document.getElementById(s.id);
+      if (el) observer.observe(el);
+    });
+    return () => observer.disconnect();
+  }, [openSections]);
 
   useEffect(() => {
     setForm(toStructuredForm(structuredReview ?? null));
@@ -479,11 +544,25 @@ export default function SubmissionDetailPage() {
 
   useEffect(() => {
     setSelectedStatus(submission?.status ?? null);
+    setStatusChangeReason('');
   }, [submission?.status]);
 
   useEffect(() => {
     setTitleDraft(submission?.title ?? '');
   }, [submission?.title]);
+
+  useEffect(() => {
+    setAssignedReviewerId(submission?.assignedReviewer ?? '');
+  }, [submission?.assignedReviewer]);
+
+  useEffect(() => {
+    setRealizationForm({
+      actualMonthlyCost: realization?.actualMonthlyCost?.toString() ?? '',
+      realizedBenefit: realization?.realizedBenefit ?? '',
+      actualGoLiveDate: realization?.actualGoLiveDate ? realization.actualGoLiveDate.split('T')[0] : '',
+      outcomeRating: realization?.outcomeRating != null ? String(realization.outcomeRating) : '',
+    });
+  }, [realization]);
 
   useEffect(() => {
     setCostPdfPreview(submission?.copilotCreditEstimatorPdfUrl ?? null);
@@ -545,6 +624,15 @@ export default function SubmissionDetailPage() {
       ),
     [aiCoeRoleOptions.data],
   );
+
+  // Resolve the assigned reviewer's display name from the CoE team roster
+  // (members carry the systemuser GUID in `memberId`), falling back to the
+  // expanded name the provider returns on the submission record.
+  const assignedReviewerLabel = useMemo(() => {
+    if (!assignedReviewerId) return submission?.assignedReviewerName ?? '';
+    const match = members.find((m) => m.memberId === assignedReviewerId);
+    return match?.userName ?? submission?.assignedReviewerName ?? '';
+  }, [assignedReviewerId, members, submission?.assignedReviewerName]);
 
   const approvalMap = useMemo(
     () => new Map(approvals.map((approval) => [approval.teamMemberId, approval])),
@@ -669,6 +757,45 @@ export default function SubmissionDetailPage() {
     setSelectedStatus(Number(value));
   }
 
+  async function handleAssignReviewer(memberSystemUserId: string) {
+    if (!submission) return;
+    const previous = assignedReviewerId;
+    setAssignedReviewerId(memberSystemUserId);
+    try {
+      await saveIdeaSubmission.mutateAsync({ id: submission.id, assignedReviewer: memberSystemUserId });
+      toast.success('Reviewer assigned.');
+    } catch (error) {
+      setAssignedReviewerId(previous);
+      const message = error instanceof Error ? error.message : 'Unknown error.';
+      toast.error(`Failed to assign reviewer: ${message}`);
+    }
+  }
+
+  async function handleSaveRealization() {
+    if (!relatedSubmissionId) return;
+    const cost = realizationForm.actualMonthlyCost.trim();
+    const parsedCost = cost === '' ? undefined : Number(cost);
+    if (parsedCost !== undefined && !Number.isFinite(parsedCost)) {
+      toast.error('Actual monthly cost must be a number.');
+      return;
+    }
+    try {
+      await saveRealization.mutateAsync({
+        submissionId: relatedSubmissionId,
+        actualMonthlyCost: parsedCost,
+        realizedBenefit: realizationForm.realizedBenefit.trim() || undefined,
+        actualGoLiveDate: realizationForm.actualGoLiveDate || undefined,
+        outcomeRating: realizationForm.outcomeRating
+          ? (Number(realizationForm.outcomeRating) as IdeaOutcomeRating)
+          : undefined,
+      });
+      toast.success('Realized outcomes saved.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error.';
+      toast.error(`Failed to save realized outcomes: ${message}`);
+    }
+  }
+
   async function handleSaveAll(): Promise<boolean> {
     if (!submission || !relatedSubmissionId) return false;
 
@@ -676,6 +803,13 @@ export default function SubmissionDetailPage() {
 
     const structuredChanged =
       structuredFormKey(form) !== structuredFormKey(toStructuredForm(structuredReview ?? null));
+
+    const nextStatus = selectedStatus ?? submission.status;
+    const statusChanged = nextStatus !== submission.status;
+    if (statusChanged && !statusChangeReason.trim()) {
+      toast.error('Add a reason for the status change.');
+      return false;
+    }
 
     try {
       await saveIdeaSubmission.mutateAsync({
@@ -712,6 +846,22 @@ export default function SubmissionDetailPage() {
           riskFactorIds: form.riskFactorIds,
           departmentIds: form.departmentIds,
         });
+      }
+
+      if (statusChanged) {
+        const fromLabel = IDEA_STATUS_LABELS[submission.status] ?? `Status ${submission.status}`;
+        const toLabel = IDEA_STATUS_LABELS[nextStatus] ?? `Status ${nextStatus}`;
+        try {
+          await createNote.mutateAsync({
+            submissionId: relatedSubmissionId,
+            subject: 'Status change',
+            noteText: `Status changed: ${fromLabel} → ${toLabel}. Reason: ${statusChangeReason.trim()}`,
+          });
+        } catch {
+          // The status itself saved; a failed activity note should not abort.
+          toast.warning('Status saved, but the activity note could not be recorded.');
+        }
+        setStatusChangeReason('');
       }
 
       toast.success('Changes saved.');
@@ -921,20 +1071,29 @@ export default function SubmissionDetailPage() {
           <Link to="/dashboard">← Back to Dashboard</Link>
         </Button>
         <div className="flex items-start justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-semibold tracking-tight">{submission.title}</h1>
-            <Button variant="outline" size="sm" asChild>
-              <Link to={`/submissions/${submission.id}/scorecard`}>
-                Scorecard
-                {typeof scorecard?.weightedTotal === 'number' && (
-                  <Badge variant="secondary" className="ml-2">
-                    {scorecard.weightedTotal} / 100
+          <h1 className="text-2xl font-semibold tracking-tight">{submission.title}</h1>
+          <div className="flex items-start gap-4 shrink-0 rounded-lg border bg-card p-3">
+            <div className="space-y-1.5">
+              <Label>Scorecard</Label>
+              <Button variant="outline" size="sm" asChild>
+                <Link to={`/submissions/${submission.id}/scorecard`}>
+                  Scorecard
+                  {typeof scorecard?.weightedTotal === 'number' && (
+                    <Badge variant="secondary" className="ml-2">
+                      {scorecard.weightedTotal} / 100
+                    </Badge>
+                  )}
+                </Link>
+              </Button>
+              {(() => {
+                const band = getScoreBand(scorecard?.weightedTotal);
+                return band ? (
+                  <Badge variant={band.badgeVariant} title={band.description}>
+                    {band.label}
                   </Badge>
-                )}
-              </Link>
-            </Button>
-          </div>
-          <div className="flex items-start gap-3 shrink-0">
+                ) : null;
+              })()}
+            </div>
             <div className="min-w-48 space-y-1.5">
               <Label>Update submission status to:</Label>
               <Select
@@ -946,13 +1105,28 @@ export default function SubmissionDetailPage() {
                   <SelectValue placeholder="Select status" />
                 </SelectTrigger>
                 <SelectContent>
-                  {IDEA_STATUS_OPTIONS.map((statusValue) => (
+                  {getAllowedStatusOptions(submission.status).map((statusValue) => (
                     <SelectItem key={statusValue} value={String(statusValue)}>
                       {IDEA_STATUS_LABELS[statusValue] ?? `Status ${statusValue}`}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
+              {selectedStatus != null && selectedStatus !== submission.status && (
+                <div className="space-y-1">
+                  <Label htmlFor="status-change-reason" className="text-xs">
+                    Reason for status change<span className="text-destructive"> *</span>
+                  </Label>
+                  <Textarea
+                    id="status-change-reason"
+                    rows={2}
+                    value={statusChangeReason}
+                    onChange={(e) => setStatusChangeReason(e.target.value)}
+                    placeholder="Explain why the status is changing. Captured in the activity notes."
+                    aria-required
+                  />
+                </div>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label>Current Status</Label>
@@ -968,22 +1142,66 @@ export default function SubmissionDetailPage() {
         <p className="text-xs text-muted-foreground mt-1">
           {submission.department && `${submission.department} · `}
           Submitted {submission.createdOn ?? 'unknown'}
+          {assignedReviewerLabel && ` · Reviewer: ${assignedReviewerLabel}`}
         </p>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[minmax(0,1fr)_360px] gap-6 items-start">
+      <div className="sticky top-12 z-10 -mx-6 flex flex-wrap items-center gap-2 border-b bg-background/95 px-6 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80">
+        <span className="text-xs font-medium text-muted-foreground mr-1">Jump to:</span>
+        {DETAIL_SECTIONS.map((section) => (
+          <Button
+            key={section.id}
+            variant={activeSection === section.id ? 'secondary' : 'ghost'}
+            size="sm"
+            aria-current={activeSection === section.id ? 'true' : undefined}
+            className={cn('h-7 px-2 text-xs', activeSection === section.id && 'font-medium')}
+            onClick={() => goToSection(section.id)}
+          >
+            {section.label}
+          </Button>
+        ))}
+        <Button
+          variant="outline"
+          size="sm"
+          className="ml-auto h-7 px-2 text-xs"
+          onClick={() => setAllSections(!allSectionsOpen)}
+        >
+          {allSectionsOpen ? 'Collapse all' : 'Expand all'}
+        </Button>
+        <Button
+          variant="outline"
+          size="sm"
+          className="h-7 px-2 text-xs"
+          onClick={() => setNotesOpen(true)}
+        >
+          <MessageSquare className="h-3.5 w-3.5" />
+          Notes
+          {notes.length > 0 && (
+            <Badge variant="secondary" className="ml-1 px-1.5 py-0 text-[10px] leading-4">
+              {notes.length}
+            </Badge>
+          )}
+        </Button>
+      </div>
+
+      <div className="grid grid-cols-1 gap-6 items-start">
         <div className="space-y-6 min-w-0">
       <CollapsibleSection
+        id="section-copilot"
         title="Copilot Assistant"
         subtitle="Scaffolded assistant panel grounded on this submission context."
-        defaultOpen={false}
+        open={openSections['section-copilot']}
+        onToggle={toggleSection}
       >
         <CopilotAssistantPanel context={copilotContext} />
       </CollapsibleSection>
 
       <CollapsibleSection
-        title="Section 1: Submitted Idea + CoE Structured Intake"
+        id="section-intake"
+        title="Section 1: Submitted Idea + Normalized Idea"
         subtitle="Read-only original idea details and editable structured CoE intake."
+        open={openSections['section-intake']}
+        onToggle={toggleSection}
       >
         <div className="grid xl:grid-cols-2 gap-6 items-start">
           <Card>
@@ -1006,7 +1224,7 @@ export default function SubmissionDetailPage() {
           </Card>
 
           <Card>
-            <CardHeader><CardTitle className="text-base">CoE Structured Intake</CardTitle></CardHeader>
+            <CardHeader><CardTitle className="text-base">Normalized Idea</CardTitle></CardHeader>
             <CardContent className="space-y-4">
               <div className="space-y-1.5">
                 <Label htmlFor="coe-intake-title">Title</Label>
@@ -1067,8 +1285,11 @@ export default function SubmissionDetailPage() {
       </CollapsibleSection>
 
       <CollapsibleSection
+        id="section-platform"
         title="Section 2: Platform Selection and Estimated Costs"
         subtitle="Capture overall costs, agent credit image evidence, and supporting notes."
+        open={openSections['section-platform']}
+        onToggle={toggleSection}
       >
         <Card>
           <CardHeader>
@@ -1296,8 +1517,11 @@ export default function SubmissionDetailPage() {
       </CollapsibleSection>
 
       <CollapsibleSection
+        id="section-approvals"
         title="Section 3: Approvals"
         subtitle="Current approvals and read-only approval history for this idea."
+        open={openSections['section-approvals']}
+        onToggle={toggleSection}
       >
         <Card>
           <CardHeader>
@@ -1311,6 +1535,28 @@ export default function SubmissionDetailPage() {
               <p className="text-sm text-muted-foreground">Loading approvals…</p>
             ) : (
               <div className="space-y-4">
+                {/* Assigned reviewer */}
+                <div className="flex flex-wrap items-center gap-2">
+                  <Label className="text-sm">Assigned reviewer</Label>
+                  <Select
+                    value={assignedReviewerId || '__none'}
+                    onValueChange={(value) => void handleAssignReviewer(value === '__none' ? '' : value)}
+                    disabled={saveIdeaSubmission.isPending || members.length === 0}
+                  >
+                    <SelectTrigger className="w-72">
+                      <SelectValue placeholder="Unassigned" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none">Unassigned</SelectItem>
+                      {members.map((m) => (
+                        <SelectItem key={m.id} value={m.memberId}>
+                          {m.userName} — {roleMap.get(m.roleId) ?? 'Unknown role'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+
                 {/* Add Approver row */}
                 {members.length > 0 && (
                   <div className="flex items-center gap-2">
@@ -1437,53 +1683,155 @@ export default function SubmissionDetailPage() {
           </CardContent>
         </Card>
       </CollapsibleSection>
-        </div>
 
-        <aside className="lg:sticky lg:top-24 lg:self-start lg:max-h-[calc(100dvh-7rem)]">
-          <Card className="bg-muted/30 lg:flex lg:max-h-[calc(100dvh-7rem)] lg:flex-col">
-            <CardHeader>
-              <CardTitle className="text-base">CoE Activity Notes</CardTitle>
-              <p className="text-xs text-muted-foreground">
-                Notes are visible to all CoE reviewers and stored as activity records in Dataverse.
+      <CollapsibleSection
+        id="section-realization"
+        title="Section 4: Realized Outcomes"
+        subtitle="Track post-approval delivery outcomes once the idea is in progress or completed."
+        open={openSections['section-realization']}
+        onToggle={toggleSection}
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Realized Outcomes</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Capture what actually happened after go-live: real run cost, the realized benefit, the
+              go-live date, and an overall outcome rating.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {!REALIZATION_STATUSES.includes(submission.status) ? (
+              <p className="text-sm text-muted-foreground">
+                Realized outcomes become editable once this idea reaches <strong>In Progress</strong> or{' '}
+                <strong>Completed</strong>. Current status:{' '}
+                {IDEA_STATUS_LABELS[submission.status] ?? 'Unknown'}.
               </p>
-            </CardHeader>
-            <CardContent className="space-y-4 lg:min-h-0 lg:flex-1 lg:overflow-y-auto">
-              <div className="space-y-2">
-                <Textarea
-                  rows={3}
-                  placeholder="Add a note visible to all CoE reviewers…"
-                  value={newNoteText}
-                  onChange={(e) => setNewNoteText(e.target.value)}
-                />
-                <Button
-                  size="sm"
-                  onClick={handleAddNote}
-                  disabled={!newNoteText.trim() || createNote.isPending}
-                >
-                  Post Note
-                </Button>
-              </div>
-
-              {notes.length > 0 && (
-                <>
-                  <Separator />
-                  <div className="space-y-0">
-                    {notes.map((note) => (
-                      <NoteTimelineItem key={note.id} note={note} />
-                    ))}
+            ) : (
+              <div className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <div className="space-y-1.5">
+                    <Label htmlFor="realization-cost">Actual monthly cost</Label>
+                    <Input
+                      id="realization-cost"
+                      type="number"
+                      min={0}
+                      step="0.01"
+                      value={realizationForm.actualMonthlyCost}
+                      onChange={(e) =>
+                        setRealizationForm((prev) => ({ ...prev, actualMonthlyCost: e.target.value }))
+                      }
+                      placeholder="e.g. 1850"
+                    />
                   </div>
-                </>
-              )}
-
-              {notes.length === 0 && (
-                <p className="text-sm text-muted-foreground">
-                  No notes yet. Post the first note above.
-                </p>
-              )}
-            </CardContent>
-          </Card>
-        </aside>
+                  <div className="space-y-1.5">
+                    <Label htmlFor="realization-golive">Actual go-live date</Label>
+                    <Input
+                      id="realization-golive"
+                      type="date"
+                      value={realizationForm.actualGoLiveDate}
+                      onChange={(e) =>
+                        setRealizationForm((prev) => ({ ...prev, actualGoLiveDate: e.target.value }))
+                      }
+                    />
+                  </div>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="realization-rating">Outcome rating</Label>
+                  <Select
+                    value={realizationForm.outcomeRating || '__none'}
+                    onValueChange={(value) =>
+                      setRealizationForm((prev) => ({
+                        ...prev,
+                        outcomeRating: value === '__none' ? '' : value,
+                      }))
+                    }
+                  >
+                    <SelectTrigger id="realization-rating" className="w-72">
+                      <SelectValue placeholder="Not rated" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="__none">Not rated</SelectItem>
+                      {OUTCOME_RATING_OPTIONS.map((option) => (
+                        <SelectItem key={option.value} value={String(option.value)}>
+                          {option.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-1.5">
+                  <Label htmlFor="realization-benefit">Realized benefit</Label>
+                  <Textarea
+                    id="realization-benefit"
+                    rows={4}
+                    value={realizationForm.realizedBenefit}
+                    onChange={(e) =>
+                      setRealizationForm((prev) => ({ ...prev, realizedBenefit: e.target.value }))
+                    }
+                    placeholder="Describe the measurable business benefit that was actually realized."
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    onClick={() => void handleSaveRealization()}
+                    disabled={saveRealization.isPending}
+                  >
+                    {saveRealization.isPending ? 'Saving…' : 'Save realized outcomes'}
+                  </Button>
+                </div>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </CollapsibleSection>
+        </div>
       </div>
+
+      <Sheet open={notesOpen} onOpenChange={setNotesOpen}>
+        <SheetContent side="right" className="w-full sm:max-w-md">
+          <SheetHeader>
+            <SheetTitle>CoE Activity Notes</SheetTitle>
+            <SheetDescription>
+              Notes are visible to all CoE reviewers and stored as activity records in Dataverse.
+            </SheetDescription>
+          </SheetHeader>
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-y-auto px-4 pb-4">
+            <div className="space-y-2">
+              <Textarea
+                rows={3}
+                placeholder="Add a note visible to all CoE reviewers…"
+                value={newNoteText}
+                onChange={(e) => setNewNoteText(e.target.value)}
+              />
+              <Button
+                size="sm"
+                onClick={handleAddNote}
+                disabled={!newNoteText.trim() || createNote.isPending}
+              >
+                Post Note
+              </Button>
+            </div>
+
+            {notes.length > 0 && (
+              <>
+                <Separator />
+                <div className="space-y-0">
+                  {notes.map((note) => (
+                    <NoteTimelineItem key={note.id} note={note} />
+                  ))}
+                </div>
+              </>
+            )}
+
+            {notes.length === 0 && (
+              <p className="text-sm text-muted-foreground">
+                No notes yet. Post the first note above.
+              </p>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
 
       <Dialog open={platformCarouselOpen} onOpenChange={setPlatformCarouselOpen}>
         <DialogContent className="sm:max-w-3xl">

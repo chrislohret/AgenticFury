@@ -11,6 +11,8 @@ import type {
   AiCoeRoleRepository,
   AiCoeTeamRepository,
   AiCoeTeamApprovalRepository,
+  ScorecardWeightRepository,
+  IdeaRealizationRepository,
 } from '@/services/data-contracts';
 import type {
   IdeaSubmission,
@@ -26,6 +28,8 @@ import type {
   AiCoeRole,
   AiCoeTeamMember,
   AiCoeTeamApproval,
+  ScorecardWeight,
+  IdeaRealization,
 } from '@/types/domain-models';
 import { mockIdeaSubmissions } from '@/mockData/ideaSubmission';
 import { mockApprovalStageRecords } from '@/mockData/approvalStageRecord';
@@ -37,7 +41,9 @@ import { mockCoeApprovalHistory } from '@/mockData/coeApprovalHistory';
 import { mockDirectoryUsers } from '@/mockData/directoryUsers';
 import { mockAiCoeTeamMembers } from '@/mockData/aiCoeTeamMember';
 import { mockAiCoeTeamApprovals } from '@/mockData/aiCoeTeamApproval';
-import { computeWeightedTotal } from '@/lib/scorecard';
+import { mockScorecardWeights } from '@/mockData/scorecardWeight';
+import { mockIdeaRealizations } from '@/mockData/ideaRealization';
+import { computeWeightedTotal, weightsListToMap } from '@/lib/scorecard';
 
 function cloneRecord<T>(record: T): T {
   return JSON.parse(JSON.stringify(record)) as T;
@@ -115,7 +121,10 @@ function createApprovalStageRepository(records: ApprovalStageRecord[]): Approval
   };
 }
 
-function createLookupOptionRepository(records: LookupOption[]): LookupOptionRepository {
+function createLookupOptionRepository(
+  records: LookupOption[],
+  reviews: CoeStructuredReview[],
+): LookupOptionRepository {
   return {
     async listByCategory(category: LookupCategory) {
       return records
@@ -153,6 +162,23 @@ function createLookupOptionRepository(records: LookupOption[]): LookupOptionRepo
       if (index >= 0) {
         records.splice(index, 1);
       }
+    },
+    async getUsageCounts() {
+      const counts: Record<string, number> = {};
+      for (const review of reviews) {
+        const ids = new Set<string>([
+          ...review.businessObjectiveIds,
+          ...review.intendedUserRoleIds,
+          ...review.dataSourceIds,
+          ...review.expectedOutcomeIds,
+          ...review.riskFactorIds,
+          ...review.departmentIds,
+        ]);
+        for (const id of ids) {
+          counts[id] = (counts[id] ?? 0) + 1;
+        }
+      }
+      return counts;
     },
   };
 }
@@ -193,13 +219,17 @@ function createCoeStructuredReviewRepository(records: CoeStructuredReview[]): Co
   };
 }
 
-function createIdeaScorecardRepository(records: IdeaScorecard[]): IdeaScorecardRepository {
+function createIdeaScorecardRepository(
+  records: IdeaScorecard[],
+  weightStore: ScorecardWeight[],
+): IdeaScorecardRepository {
   return {
     async getBySubmissionId(submissionId: string) {
       const record = records.find((r) => r.submissionId === submissionId);
       return record ? cloneRecord(record) : null;
     },
     async save(input: Partial<IdeaScorecard> & { submissionId: string }) {
+      const weightMap = weightsListToMap(weightStore);
       const scores = {
         businessValue: input.businessValueScore,
         efficiency: input.efficiencyScore,
@@ -210,13 +240,16 @@ function createIdeaScorecardRepository(records: IdeaScorecard[]): IdeaScorecardR
       const index = records.findIndex((r) => r.submissionId === input.submissionId);
       if (index >= 0) {
         const merged = { ...records[index], ...input };
-        merged.weightedTotal = computeWeightedTotal({
-          businessValue: merged.businessValueScore,
-          efficiency: merged.efficiencyScore,
-          adoption: merged.adoptionScore,
-          trustGovernance: merged.trustGovernanceScore,
-          technicalPerformance: merged.technicalPerformanceScore,
-        });
+        merged.weightedTotal = computeWeightedTotal(
+          {
+            businessValue: merged.businessValueScore,
+            efficiency: merged.efficiencyScore,
+            adoption: merged.adoptionScore,
+            trustGovernance: merged.trustGovernanceScore,
+            technicalPerformance: merged.technicalPerformanceScore,
+          },
+          weightMap,
+        );
         merged.scoredBy = input.scoredBy ?? records[index].scoredBy;
         merged.scoredByName = input.scoredByName ?? records[index].scoredByName ?? 'CoE Reviewer';
         merged.scoredOn = new Date().toISOString().split('T')[0];
@@ -237,10 +270,53 @@ function createIdeaScorecardRepository(records: IdeaScorecard[]): IdeaScorecardR
         adoptionNotes: input.adoptionNotes,
         trustGovernanceNotes: input.trustGovernanceNotes,
         technicalPerformanceNotes: input.technicalPerformanceNotes,
-        weightedTotal: computeWeightedTotal(scores),
+        weightedTotal: computeWeightedTotal(scores, weightMap),
         scoredBy: input.scoredBy,
         scoredByName: input.scoredByName ?? 'CoE Reviewer',
         scoredOn: new Date().toISOString().split('T')[0],
+      };
+      records.push(record);
+      return cloneRecord(record);
+    },
+  };
+}
+
+function createScorecardWeightRepository(records: ScorecardWeight[]): ScorecardWeightRepository {
+  return {
+    async list() {
+      return records.map(cloneRecord);
+    },
+    async saveWeights(weights) {
+      for (const entry of weights) {
+        const index = records.findIndex((r) => r.dimensionKey === entry.dimensionKey);
+        if (index >= 0) {
+          records[index] = { ...records[index], weight: entry.weight };
+        }
+      }
+      return records.map(cloneRecord);
+    },
+  };
+}
+
+function createIdeaRealizationRepository(records: IdeaRealization[]): IdeaRealizationRepository {
+  return {
+    async getBySubmissionId(submissionId: string) {
+      const record = records.find((r) => r.submissionId === submissionId);
+      return record ? cloneRecord(record) : null;
+    },
+    async save(input: Partial<IdeaRealization> & { submissionId: string }) {
+      const index = records.findIndex((r) => r.submissionId === input.submissionId);
+      if (index >= 0) {
+        records[index] = { ...records[index], ...input };
+        return cloneRecord(records[index]);
+      }
+      const record: IdeaRealization = {
+        id: crypto.randomUUID(),
+        submissionId: input.submissionId,
+        actualMonthlyCost: input.actualMonthlyCost,
+        realizedBenefit: input.realizedBenefit,
+        actualGoLiveDate: input.actualGoLiveDate,
+        outcomeRating: input.outcomeRating,
       };
       records.push(record);
       return cloneRecord(record);
@@ -421,18 +497,22 @@ export function createMockDataProvider(): AppDataProvider {
   const usersStore = mockDirectoryUsers.map(cloneRecord);
   const teamStore = mockAiCoeTeamMembers.map(cloneRecord);
   const approvalStore = mockAiCoeTeamApprovals.map(cloneRecord);
+  const scorecardWeightStore = mockScorecardWeights.map(cloneRecord);
+  const realizationStore = mockIdeaRealizations.map(cloneRecord);
 
   return {
     ideaSubmissions: createIdeaSubmissionRepository(ideaStore),
     approvalStages: createApprovalStageRepository(stageStore),
-    lookupOptions: createLookupOptionRepository(lookupStore),
+    lookupOptions: createLookupOptionRepository(lookupStore, reviewStore),
     coeStructuredReviews: createCoeStructuredReviewRepository(reviewStore),
-    ideaScorecards: createIdeaScorecardRepository(scorecardStore),
+    ideaScorecards: createIdeaScorecardRepository(scorecardStore, scorecardWeightStore),
+    scorecardWeights: createScorecardWeightRepository(scorecardWeightStore),
     coeNotes: createCoeNoteRepository(noteStore),
     coeApprovalHistory: createCoeApprovalHistoryRepository(approvalHistoryStore),
     aiCoeRoles: createAiCoeRoleRepository(lookupStore),
     aiCoeTeam: createAiCoeTeamRepository(teamStore),
     aiCoeTeamApprovals: createAiCoeTeamApprovalRepository(approvalStore),
+    ideaRealizations: createIdeaRealizationRepository(realizationStore),
     directoryUsers: createDirectoryUserRepository(usersStore),
     fieldMetadata: {
       async getField() { return null; },

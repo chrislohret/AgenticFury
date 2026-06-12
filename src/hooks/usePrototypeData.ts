@@ -1,4 +1,5 @@
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient, useQueries } from '@tanstack/react-query';
+import { useMemo } from 'react';
 import { createAppDataProvider } from '@/services/providerFactory';
 import type {
   IdeaSubmission,
@@ -13,7 +14,10 @@ import type {
   AiCoeRole,
   AiCoeTeamApproval,
   AiCoeTeamMember,
+  ScorecardWeight,
+  IdeaRealization,
 } from '@/types/domain-models';
+import type { ScorecardDimensionKey } from '@/constants/scorecard';
 
 const provider = createAppDataProvider();
 
@@ -24,13 +28,16 @@ export const queryKeys = {
   ideaSubmissionsPendingForStage: (stage: ApprovalStage) => ['ideaSubmissions', 'pending', stage] as const,
   approvalStages: (submissionId: string) => ['approvalStages', submissionId] as const,
   lookupOptionsByCategory: (category: LookupCategory) => ['lookupOptions', category] as const,
+  lookupOptionUsage: ['lookupOptions', 'usage'] as const,
   coeStructuredReviewBySubmission: (submissionId: string) => ['coeStructuredReview', submissionId] as const,
   ideaScorecardBySubmission: (submissionId: string) => ['ideaScorecard', submissionId] as const,
+  scorecardWeights: ['scorecardWeights'] as const,
   coeNotesBySubmission: (submissionId: string) => ['coeNotes', submissionId] as const,
   coeApprovalHistoryBySubmission: (submissionId: string) => ['coeApprovalHistory', submissionId] as const,
   aiCoeTeam: ['aiCoeTeam'] as const,
   aiCoeRoles: ['aiCoeRoles'] as const,
   aiCoeTeamApprovalsBySubmission: (submissionId: string) => ['aiCoeTeamApprovals', submissionId] as const,
+  ideaRealizationBySubmission: (submissionId: string) => ['ideaRealization', submissionId] as const,
   directoryUsers: ['directoryUsers'] as const,
 };
 
@@ -140,6 +147,14 @@ export function useLookupOptions(category: LookupCategory, enabled = true) {
   });
 }
 
+export function useLookupOptionUsage(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.lookupOptionUsage,
+    queryFn: () => provider.lookupOptions.getUsageCounts(),
+    enabled,
+  });
+}
+
 export function useSaveLookupOption() {
   const queryClient = useQueryClient();
   return useMutation({
@@ -156,6 +171,7 @@ export function useDeleteLookupOption(category: LookupCategory) {
     mutationFn: (id: string) => provider.lookupOptions.delete(id),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: queryKeys.lookupOptionsByCategory(category) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.lookupOptionUsage });
     },
   });
 }
@@ -214,6 +230,26 @@ export function useSaveIdeaScorecard() {
   });
 }
 
+export function useScorecardWeights() {
+  return useQuery({
+    queryKey: queryKeys.scorecardWeights,
+    queryFn: () => provider.scorecardWeights.list(),
+    staleTime: 30 * 60 * 1000,
+  });
+}
+
+export function useSaveScorecardWeights() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (weights: { dimensionKey: ScorecardDimensionKey; weight: number }[]) =>
+      provider.scorecardWeights.saveWeights(weights),
+    onSuccess: (saved) => {
+      queryClient.setQueryData<ScorecardWeight[]>(queryKeys.scorecardWeights, saved);
+      queryClient.invalidateQueries({ queryKey: queryKeys.scorecardWeights });
+    },
+  });
+}
+
 export function useCoeNotes(submissionId: string | undefined) {
   return useQuery({
     queryKey: queryKeys.coeNotesBySubmission(submissionId || ''),
@@ -267,6 +303,32 @@ export function useCreateCoeApprovalHistory() {
         queryKeys.coeApprovalHistoryBySubmission(entry.submissionId),
         (old) => (old ? [entry, ...old] : [entry]),
       );
+    },
+  });
+}
+
+export function useIdeaRealization(submissionId: string | undefined) {
+  return useQuery({
+    queryKey: queryKeys.ideaRealizationBySubmission(submissionId || ''),
+    queryFn: () => (
+      submissionId
+        ? provider.ideaRealizations.getBySubmissionId(submissionId)
+        : Promise.resolve(null as IdeaRealization | null)
+    ),
+    enabled: Boolean(submissionId),
+  });
+}
+
+export function useSaveIdeaRealization() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Partial<IdeaRealization> & { submissionId: string }) =>
+      provider.ideaRealizations.save(input),
+    onSuccess: (record) => {
+      queryClient.setQueryData(queryKeys.ideaRealizationBySubmission(record.submissionId), record);
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.ideaRealizationBySubmission(record.submissionId),
+      });
     },
   });
 }
@@ -397,4 +459,63 @@ export function useDeleteAiCoeTeamApproval(submissionId: string | undefined) {
       );
     },
   });
+}
+
+/**
+ * An entry in the signed-in reviewer's personal approvals queue: a submission
+ * awaiting CoE review together with its scorecard and the reviewer's own
+ * approval record (if any).
+ */
+export interface MyApprovalItem {
+  submission: IdeaSubmission;
+  scorecard: IdeaScorecard | null;
+  myApproval: AiCoeTeamApproval | undefined;
+}
+
+/**
+ * Builds the "My Approvals" queue for a given AI CoE team member. Returns the
+ * submissions in CoE review that the member has NOT yet approved or denied
+ * (no approval record, or one still marked pending), each enriched with its
+ * scorecard so the queue can show the weighted score and decision band.
+ *
+ * Pass the team-member record id (AiCoeTeamMember.id) — resolve it in the page
+ * from useCurrentUser() + useAiCoeTeam() to avoid a circular import here.
+ */
+export function useMyPendingApprovals(memberId: string | undefined) {
+  const { data: pending = [], isLoading: pendingLoading } =
+    useIdeaSubmissionsPendingForStage('coe-review');
+
+  const approvalResults = useQueries({
+    queries: pending.map((submission) => ({
+      queryKey: queryKeys.aiCoeTeamApprovalsBySubmission(submission.id),
+      queryFn: () => provider.aiCoeTeamApprovals.listBySubmission(submission.id),
+    })),
+  });
+
+  const scorecardResults = useQueries({
+    queries: pending.map((submission) => ({
+      queryKey: queryKeys.ideaScorecardBySubmission(submission.id),
+      queryFn: () => provider.ideaScorecards.getBySubmissionId(submission.id),
+    })),
+  });
+
+  const items = useMemo<MyApprovalItem[]>(() => {
+    return pending
+      .map((submission, index) => {
+        const approvals = approvalResults[index]?.data ?? [];
+        const scorecard = scorecardResults[index]?.data ?? null;
+        const myApproval = memberId
+          ? approvals.find((a) => a.teamMemberId === memberId)
+          : undefined;
+        return { submission, scorecard, myApproval };
+      })
+      .filter((item) => !item.myApproval || item.myApproval.approvalStatus === 'pending');
+  }, [pending, approvalResults, scorecardResults, memberId]);
+
+  const isLoading =
+    pendingLoading ||
+    approvalResults.some((r) => r.isLoading) ||
+    scorecardResults.some((r) => r.isLoading);
+
+  return { items, isLoading };
 }

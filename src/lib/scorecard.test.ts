@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { computeWeightedTotal, isScorecardComplete, type ScorecardScores } from './scorecard';
+import {
+  computeWeightedTotal,
+  isScorecardComplete,
+  weightsListToMap,
+  type ScorecardScores,
+} from './scorecard';
 
 describe('computeWeightedTotal', () => {
   it('returns 100 when every dimension is the maximum score', () => {
@@ -52,6 +57,61 @@ describe('computeWeightedTotal', () => {
     };
     // BV clamps to 5 → 25, Eff clamps to 0 → 0, others max → 15+25+15
     expect(computeWeightedTotal(scores)).toBe(80);
+  });
+
+  it('uses supplied weights instead of the defaults', () => {
+    const scores: ScorecardScores = {
+      businessValue: 5,
+      efficiency: 5,
+      adoption: 5,
+      trustGovernance: 5,
+      technicalPerformance: 5,
+    };
+    // Equal 20% weights summing to 100; full marks → 100.
+    const weights = {
+      businessValue: 20,
+      efficiency: 20,
+      adoption: 20,
+      trustGovernance: 20,
+      technicalPerformance: 20,
+    };
+    expect(computeWeightedTotal(scores, weights)).toBe(100);
+  });
+
+  it('weights a single dimension fully when configured at 100', () => {
+    const scores: ScorecardScores = {
+      businessValue: 4,
+      efficiency: 5,
+      adoption: 5,
+      trustGovernance: 5,
+      technicalPerformance: 5,
+    };
+    const weights = {
+      businessValue: 100,
+      efficiency: 0,
+      adoption: 0,
+      trustGovernance: 0,
+      technicalPerformance: 0,
+    };
+    // Only business value counts: (4/5)*100 = 80.
+    expect(computeWeightedTotal(scores, weights)).toBe(80);
+  });
+
+  it('falls back to the code default for any weight key not supplied', () => {
+    const scores: ScorecardScores = { businessValue: 5 };
+    // businessValue default weight is 25; no override provided.
+    expect(computeWeightedTotal(scores, { efficiency: 50 })).toBe(25);
+  });
+});
+
+describe('weightsListToMap', () => {
+  it('builds a keyed map from a list of dimension/weight pairs', () => {
+    expect(
+      weightsListToMap([
+        { dimensionKey: 'businessValue', weight: 30 },
+        { dimensionKey: 'efficiency', weight: 70 },
+      ]),
+    ).toEqual({ businessValue: 30, efficiency: 70 });
   });
 });
 
