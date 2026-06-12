@@ -9,15 +9,14 @@ const navSections = [
     items: [
       { to: "/dashboard", label: "Dashboard" },
       { to: "/analytics", label: "Analytics", adminOnly: true },
-      { to: "/my-ideas", label: "My Ideas" },
       { to: "/submit", label: "Submit Idea" },
     ],
   },
   {
     title: "Review",
-    adminOnly: true,
     items: [
-      { to: "/my-approvals", label: "My Approvals" },
+      { to: "/my-approvals", label: "My Approvals", adminOnly: true },
+      { to: "/my-ideas", label: "My Ideas" },
     ],
   },
   {
