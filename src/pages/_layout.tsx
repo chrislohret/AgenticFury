@@ -8,6 +8,7 @@ const navSections = [
     title: "Ideas",
     items: [
       { to: "/dashboard", label: "Dashboard" },
+      { to: "/analytics", label: "Analytics", adminOnly: true },
       { to: "/my-ideas", label: "My Ideas" },
       { to: "/submit", label: "Submit Idea" },
     ],
@@ -23,7 +24,6 @@ const navSections = [
     title: "Admin",
     adminOnly: true,
     items: [
-      { to: "/analytics", label: "Analytics" },
       { to: "/ai-coe-team", label: "AI CoE Team" },
       { to: "/coe-roles", label: "AI CoE Roles" },
       { to: "/scorecard-config", label: "Scorecard Configuration" },
@@ -55,7 +55,9 @@ export default function Layout() {
                 <p className="px-3 pt-2 pb-1 text-xs font-semibold uppercase tracking-wide text-muted-foreground">
                   {section.title}
                 </p>
-                {section.items.map(({ to, label }) => (
+                {section.items
+                  .filter((item) => !("adminOnly" in item && item.adminOnly) || isAdmin)
+                  .map(({ to, label }) => (
                   <NavLink
                     key={to}
                     to={to}
