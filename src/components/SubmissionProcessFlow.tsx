@@ -8,7 +8,7 @@ import {
   SUBMISSION_STAGE_ORDER,
   submissionStageLabel,
 } from '@/constants/submissionStage';
-import { BUILD_STAGE, buildStageLabel, getAllowedBuildStages } from '@/constants/buildStage';
+import { BUILD_STAGE, BUILD_STAGE_ORDER, buildStageLabel } from '@/constants/buildStage';
 import { APPROVAL_STATUS, approvalStatusLabel } from '@/constants/approvalStatus';
 
 type PhaseKey = 'submission' | 'approval' | 'build';
@@ -297,7 +297,7 @@ export function SubmissionProcessFlow({
               >
                 Not started
               </Button>
-              {getAllowedBuildStages(buildStage).map((value) => {
+              {BUILD_STAGE_ORDER.map((value) => {
                 const isCurrent = value === build;
                 const isCancelled = value === BUILD_STAGE.CANCELLED;
                 return (

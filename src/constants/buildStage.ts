@@ -20,6 +20,16 @@ export const BUILD_STAGE_LABELS: Record<number, string> = {
   [BUILD_STAGE.CANCELLED]: 'Cancelled',
 };
 
+/**
+ * Build phases in workflow order, used to render the full picker in the process
+ * flow. `null` (Not started) precedes these and is offered separately.
+ */
+export const BUILD_STAGE_ORDER: number[] = [
+  BUILD_STAGE.IN_PROGRESS,
+  BUILD_STAGE.COMPLETED,
+  BUILD_STAGE.CANCELLED,
+];
+
 /** Label for a build stage value that may be null (Not started). */
 export function buildStageLabel(stage: number | null | undefined): string {
   if (stage == null) return 'Not started';
