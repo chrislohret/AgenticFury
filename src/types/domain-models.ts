@@ -12,6 +12,8 @@ export type StageStatus = 'pending' | 'approved' | 'rejected' | 'on-hold';export
 
 export interface IdeaSubmission {
   id: string;
+  /** Human-readable submission identifier (afp_submissionid autonumber). */
+  submissionRef?: string;
   title: string;
   businessObjectives: string;
   intendedUserRoles: string;

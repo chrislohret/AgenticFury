@@ -133,9 +133,14 @@ export function IdeaListPanel({
               to={`/submissions/${submission.id}`}
               className="flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors"
             >
-              <div className="min-w-0">
-                <p className="text-sm font-medium truncate">{submission.title}</p>
-                <p className="text-xs text-muted-foreground">{submission.department} · {submission.createdOn}</p>
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="shrink-0 font-mono text-xs text-muted-foreground tabular-nums w-24 truncate">
+                  {submission.submissionRef ?? '—'}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{submission.title}</p>
+                  <p className="text-xs text-muted-foreground">{submission.department} · {submission.createdOn}</p>
+                </div>
               </div>
               <div className="flex items-center gap-2 ml-4 shrink-0">
                 {submission.phiRequired && (

@@ -472,6 +472,7 @@ function mapIdeaSubmission(record: DataverseRecord, imageUrl?: string, pdfUrl?: 
   const createdBy = safeRecord.createdby as { systemuserid?: string; id?: string } | undefined;
   return {
     id: getRecordGuid(safeRecord),
+    submissionRef: normalizeText(safeRecord.afp_submissionid) || undefined,
     title: normalizeText(safeRecord.afp_title),
     businessObjectives: normalizeText(safeRecord.afp_businessobjectives),
     intendedUserRoles: normalizeText(safeRecord.afp_intendeduserroles),
@@ -683,6 +684,7 @@ async function listIdeaRecords(): Promise<DataverseRecord[]> {
     TABLES.idea,
     selectFields([
       'afp_idearequirementid',
+      'afp_submissionid',
       'afp_title',
       'afp_businessobjectives',
       'afp_intendeduserroles',
@@ -719,6 +721,7 @@ async function getIdeaRecordById(id: string): Promise<DataverseRecord | null> {
     id,
     selectFields([
       'afp_idearequirementid',
+      'afp_submissionid',
       'afp_title',
       'afp_businessobjectives',
       'afp_intendeduserroles',
