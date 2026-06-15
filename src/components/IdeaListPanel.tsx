@@ -1,6 +1,8 @@
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { Link } from 'react-router-dom';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Input } from '@/components/ui/input';
@@ -14,6 +16,8 @@ import {
 import type { IdeaSubmission } from '@/types/domain-models';
 
 type SortKey = 'newest' | 'oldest' | 'title' | 'status';
+
+const PAGE_SIZE = 10;
 
 export interface IdeaListPanelProps {
   /** Submissions already filtered by the active card filter. */
@@ -39,6 +43,7 @@ export function IdeaListPanel({
 }: IdeaListPanelProps) {
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('newest');
+  const [page, setPage] = useState(0);
 
   const visibleSubmissions = useMemo(() => {
     let list = [...submissions];
@@ -68,7 +73,20 @@ export function IdeaListPanel({
   }, [submissions, search, sortKey, sortValue]);
 
   const searchNarrowed = isNarrowed || Boolean(search.trim());
-  const displayedSubmissions = searchNarrowed ? visibleSubmissions : visibleSubmissions.slice(0, 6);
+  const pageCount = Math.max(1, Math.ceil(visibleSubmissions.length / PAGE_SIZE));
+  const currentPage = Math.min(page, pageCount - 1);
+  const displayedSubmissions = visibleSubmissions.slice(
+    currentPage * PAGE_SIZE,
+    currentPage * PAGE_SIZE + PAGE_SIZE,
+  );
+
+  // Reset to the first page whenever the filtered/sorted result set changes.
+  useEffect(() => {
+    setPage(0);
+  }, [search, sortKey, submissions]);
+
+  const rangeStart = visibleSubmissions.length === 0 ? 0 : currentPage * PAGE_SIZE + 1;
+  const rangeEnd = Math.min(currentPage * PAGE_SIZE + PAGE_SIZE, visibleSubmissions.length);
 
   return (
     <div>
@@ -127,6 +145,40 @@ export function IdeaListPanel({
               </div>
             </Link>
           ))}
+        </div>
+      )}
+      {!isLoading && visibleSubmissions.length > PAGE_SIZE && (
+        <div className="flex items-center justify-between gap-3 mt-3">
+          <p className="text-xs text-muted-foreground">
+            Showing {rangeStart}–{rangeEnd} of {visibleSubmissions.length}
+          </p>
+          <div className="flex items-center gap-2">
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={() => setPage((p) => Math.max(0, p - 1))}
+              disabled={currentPage === 0}
+              aria-label="Previous page"
+            >
+              <ChevronLeft className="h-4 w-4" />
+              Previous
+            </Button>
+            <span className="text-xs text-muted-foreground tabular-nums">
+              Page {currentPage + 1} of {pageCount}
+            </span>
+            <Button
+              variant="outline"
+              size="sm"
+              className="h-8"
+              onClick={() => setPage((p) => Math.min(pageCount - 1, p + 1))}
+              disabled={currentPage >= pageCount - 1}
+              aria-label="Next page"
+            >
+              Next
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
         </div>
       )}
     </div>
