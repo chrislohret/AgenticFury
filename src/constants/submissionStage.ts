@@ -10,6 +10,7 @@ export const SUBMISSION_STAGE = {
   SUBMITTED: 747150003,
   DRAFT: 747150004,
   IN_PROGRESS: 747150005,
+  REVIEW_COMPLETED: 747150006,
 } as const;
 
 export type SubmissionStageValue = (typeof SUBMISSION_STAGE)[keyof typeof SUBMISSION_STAGE];
@@ -27,8 +28,22 @@ export const SUBMISSION_STAGE_LABELS: Record<number, string> = {
   [SUBMISSION_STAGE.SUBMITTED]: 'Submitted',
   [SUBMISSION_STAGE.IN_REVIEW]: 'In Review',
   [SUBMISSION_STAGE.IN_PROGRESS]: 'In Progress',
+  [SUBMISSION_STAGE.REVIEW_COMPLETED]: 'Review Completed',
   [SUBMISSION_STAGE.ON_HOLD]: 'On Hold',
 };
+
+/**
+ * Submission stages in workflow order, used to render the full picker in the
+ * process flow. Review Completed is the gate that unlocks the approval phase.
+ */
+export const SUBMISSION_STAGE_ORDER: number[] = [
+  SUBMISSION_STAGE.DRAFT,
+  SUBMISSION_STAGE.SUBMITTED,
+  SUBMISSION_STAGE.IN_REVIEW,
+  SUBMISSION_STAGE.IN_PROGRESS,
+  SUBMISSION_STAGE.REVIEW_COMPLETED,
+  SUBMISSION_STAGE.ON_HOLD,
+];
 
 /** Label for a stage value that may be null/undefined (treated as Draft). */
 export function submissionStageLabel(stage: number | null | undefined): string {
@@ -41,6 +56,7 @@ export const SUBMISSION_STAGE_BADGE_VARIANT: Record<number, BadgeVariant> = {
   [SUBMISSION_STAGE.SUBMITTED]: 'secondary',
   [SUBMISSION_STAGE.IN_REVIEW]: 'default',
   [SUBMISSION_STAGE.IN_PROGRESS]: 'default',
+  [SUBMISSION_STAGE.REVIEW_COMPLETED]: 'default',
   [SUBMISSION_STAGE.ON_HOLD]: 'destructive',
 };
 
@@ -56,8 +72,17 @@ export function submissionStageBadgeVariant(stage: number | null | undefined): B
 export const SUBMISSION_STAGE_TRANSITIONS: Record<number, number[]> = {
   [SUBMISSION_STAGE.DRAFT]: [SUBMISSION_STAGE.SUBMITTED],
   [SUBMISSION_STAGE.SUBMITTED]: [SUBMISSION_STAGE.IN_REVIEW, SUBMISSION_STAGE.ON_HOLD],
-  [SUBMISSION_STAGE.IN_REVIEW]: [SUBMISSION_STAGE.IN_PROGRESS, SUBMISSION_STAGE.ON_HOLD],
-  [SUBMISSION_STAGE.IN_PROGRESS]: [SUBMISSION_STAGE.IN_REVIEW, SUBMISSION_STAGE.ON_HOLD],
+  [SUBMISSION_STAGE.IN_REVIEW]: [
+    SUBMISSION_STAGE.IN_PROGRESS,
+    SUBMISSION_STAGE.REVIEW_COMPLETED,
+    SUBMISSION_STAGE.ON_HOLD,
+  ],
+  [SUBMISSION_STAGE.IN_PROGRESS]: [
+    SUBMISSION_STAGE.IN_REVIEW,
+    SUBMISSION_STAGE.REVIEW_COMPLETED,
+    SUBMISSION_STAGE.ON_HOLD,
+  ],
+  [SUBMISSION_STAGE.REVIEW_COMPLETED]: [SUBMISSION_STAGE.IN_REVIEW, SUBMISSION_STAGE.ON_HOLD],
   [SUBMISSION_STAGE.ON_HOLD]: [SUBMISSION_STAGE.IN_REVIEW, SUBMISSION_STAGE.SUBMITTED],
 };
 

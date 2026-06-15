@@ -61,6 +61,7 @@ export function deriveLegacyStatusCode(
       return IDEA_STATUS.SUBMITTED;
     case SUBMISSION_STAGE.IN_REVIEW:
     case SUBMISSION_STAGE.IN_PROGRESS:
+    case SUBMISSION_STAGE.REVIEW_COMPLETED:
       return IDEA_STATUS.UNDER_REVIEW;
     case SUBMISSION_STAGE.ON_HOLD:
       return IDEA_STATUS.ON_HOLD;

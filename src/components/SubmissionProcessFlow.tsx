@@ -5,8 +5,8 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import {
   SUBMISSION_STAGE,
+  SUBMISSION_STAGE_ORDER,
   submissionStageLabel,
-  getAllowedSubmissionStages,
 } from '@/constants/submissionStage';
 import { BUILD_STAGE, buildStageLabel, getAllowedBuildStages } from '@/constants/buildStage';
 import { APPROVAL_STATUS, approvalStatusLabel } from '@/constants/approvalStatus';
@@ -92,16 +92,25 @@ export function SubmissionProcessFlow({
   const approved = approval === APPROVAL_STATUS.APPROVED;
   const denied = approval === APPROVAL_STATUS.DENIED;
 
+  // The approval phase unlocks only once the submission review is complete, or
+  // once a decision has already been recorded.
+  const reviewCompleted = stage === SUBMISSION_STAGE.REVIEW_COMPLETED;
+  const approvalUnlocked = reviewCompleted || approvalDecided;
+
   // Derive per-phase state for the chevron rail.
   const submissionState: PhaseState =
-    stage === SUBMISSION_STAGE.ON_HOLD ? 'offtrack' : approvalDecided ? 'done' : 'active';
+    stage === SUBMISSION_STAGE.ON_HOLD
+      ? 'offtrack'
+      : approvalUnlocked
+        ? 'done'
+        : 'active';
 
-  const approvalState: PhaseState = denied
-    ? 'offtrack'
-    : approved
-      ? 'done'
-      : approvalDecided
-        ? 'active'
+  const approvalState: PhaseState = !approvalUnlocked
+    ? 'locked'
+    : denied
+      ? 'offtrack'
+      : approved
+        ? 'done'
         : 'active';
 
   const buildState: PhaseState = !approved
@@ -120,7 +129,7 @@ export function SubmissionProcessFlow({
 
   // The active phase is the first one not yet completed; this is what we expand.
   const activePhase: PhaseKey =
-    !approvalDecided || stage === SUBMISSION_STAGE.ON_HOLD
+    !approvalUnlocked || stage === SUBMISSION_STAGE.ON_HOLD
       ? 'submission'
       : approved
         ? 'build'
@@ -128,7 +137,7 @@ export function SubmissionProcessFlow({
 
   const phaseSummary: Record<PhaseKey, string> = {
     submission: submissionStageLabel(submissionStage),
-    approval: approvalStatusLabel(approvalStatus),
+    approval: approvalUnlocked ? approvalStatusLabel(approvalStatus) : 'Locked',
     build: approved ? buildStageLabel(buildStage) : 'Locked',
   };
 
@@ -188,7 +197,7 @@ export function SubmissionProcessFlow({
               Move submission to
             </Label>
             <div className="flex flex-wrap gap-2">
-              {getAllowedSubmissionStages(submissionStage).map((value) => {
+              {SUBMISSION_STAGE_ORDER.map((value) => {
                 const isCurrent = value === stage;
                 const isOnHold = value === SUBMISSION_STAGE.ON_HOLD;
                 return (
@@ -224,8 +233,8 @@ export function SubmissionProcessFlow({
               </div>
             )}
             <p className="text-xs text-muted-foreground">
-              The submission moves through CoE intake here. Record an approval decision once review
-              is complete.
+              The submission moves through CoE intake here. Mark it{' '}
+              <span className="font-medium">Review Completed</span> to unlock the approval decision.
             </p>
           </div>
         )}
