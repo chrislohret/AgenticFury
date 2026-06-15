@@ -33,6 +33,24 @@ export interface IdeaSubmission {
   overallCostNotesHtml?: string;
   aiPlatformSelection?: number;
   status: number;
+  /**
+   * Submission stage (afp_ideasubmissionstage): Submitted, In Review, On Hold,
+   * Approved, Rejected. `null`/undefined means Draft (the field has no Draft
+   * option). This is the status surfaced on the Submission Status dashboard and
+   * the detail page selector.
+   */
+  submissionStage?: number | null;
+  /**
+   * Formal approval decision (afp_approvalstatus): Approved or Denied. Set
+   * automatically when the submission stage reaches Approved/Rejected.
+   */
+  approvalStatus?: number | null;
+  /**
+   * Build phase (afp_ideabuildstage): In Progress, Completed, Cancelled. Only
+   * meaningful once approved; `null` means Not started. Drives the Build Phase
+   * dashboard and gates the Realized Outcomes section.
+   */
+  buildStage?: number | null;
   department?: string;
   /**
    * CoE-normalized department names mirrored from the structured review

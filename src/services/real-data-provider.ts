@@ -3,7 +3,9 @@ import type { IOperationResult } from '@microsoft/power-apps/data';
 import { getClient } from '@microsoft/power-apps/data';
 import { dataSourcesInfo } from '../../.power/schemas/appschemas/dataSourcesInfo';
 import { MicrosoftDataverseService } from '@/generated/services/MicrosoftDataverseService';
-import { IDEA_STATUS, IDEA_STATUS_STATECODE, IDEA_STATE } from '@/constants/ideaStatus';
+import { IDEA_STATUS } from '@/constants/ideaStatus';
+import { SUBMISSION_STAGE } from '@/constants/submissionStage';
+import { deriveLegacyStatusCode, legacyStateForStatusCode } from '@/constants/approvalStatus';
 import { SCORECARD_DIMENSIONS, type ScorecardDimensionKey } from '@/constants/scorecard';
 import { computeWeightedTotal, weightsListToMap, type ScorecardWeightMap } from '@/lib/scorecard';
 import { getFieldMetadata } from '@/services/field-metadata-cache';
@@ -489,6 +491,9 @@ function mapIdeaSubmission(record: DataverseRecord, imageUrl?: string, pdfUrl?: 
     overallCostNotesHtml: normalizeText(safeRecord.afp_overallcostnoteshtml) || undefined,
     aiPlatformSelection: normalizeNumber(safeRecord.afp_aiplatformselection),
     status: mapIdeaStatus(safeRecord.statuscode),
+    submissionStage: normalizeNumber(safeRecord.afp_ideasubmissionstage) ?? null,
+    approvalStatus: normalizeNumber(safeRecord.afp_approvalstatus) ?? null,
+    buildStage: normalizeNumber(safeRecord.afp_ideabuildstage) ?? null,
     department: normalizeText(safeRecord.afp_department) || undefined,
     normalizedDepartments: splitCsv(safeRecord.afp_aicoedepartments),
     submittedBy: normalizeId(createdBy?.systemuserid ?? createdBy?.id ?? safeRecord._createdby_value ?? safeRecord.createdby_value) || undefined,
@@ -695,6 +700,9 @@ async function listIdeaRecords(): Promise<DataverseRecord[]> {
       'afp_datasourcenotes',
       'afp_overallcostnoteshtml',
       'afp_aiplatformselection',
+      'afp_ideasubmissionstage',
+      'afp_approvalstatus',
+      'afp_ideabuildstage',
       'statuscode',
       'createdon',
       'createdby',
@@ -730,6 +738,9 @@ async function getIdeaRecordById(id: string): Promise<DataverseRecord | null> {
       'afp_datasourcenotes',
       'afp_overallcostnoteshtml',
       'afp_aiplatformselection',
+      'afp_ideasubmissionstage',
+      'afp_approvalstatus',
+      'afp_ideabuildstage',
       'statuscode',
       'createdon',
       'createdby',
@@ -817,7 +828,11 @@ export function createRealDataProvider(): AppDataProvider {
       },
       async listPendingForStage() {
         const records = await this.list();
-        return records.filter((record) => record.status === IDEA_STATUS.SUBMITTED || record.status === IDEA_STATUS.UNDER_REVIEW);
+        return records.filter(
+          (record) =>
+            record.submissionStage === SUBMISSION_STAGE.SUBMITTED ||
+            record.submissionStage === SUBMISSION_STAGE.IN_REVIEW,
+        );
       },
       async getById(id: string) {
         return buildIdeaFromDataverse(id);
@@ -825,7 +840,21 @@ export function createRealDataProvider(): AppDataProvider {
       async save(input: Partial<IdeaSubmission>) {
         const id = input.id ?? crypto.randomUUID();
         const existing = input.id ? await buildIdeaFromDataverse(input.id) : null;
-        const statusValue = input.status ?? existing?.status ?? IDEA_STATUS.DRAFT;
+
+        // Resolve the new stage fields. submissionStage may be null (Draft).
+        const submissionStage =
+          input.submissionStage !== undefined ? input.submissionStage : existing?.submissionStage ?? null;
+        const buildStage =
+          input.buildStage !== undefined ? input.buildStage : existing?.buildStage ?? null;
+        // Approval decision is its own field; explicit input wins, otherwise
+        // keep what exists. Pending is represented by null.
+        const approvalStatus =
+          input.approvalStatus !== undefined ? input.approvalStatus : existing?.approvalStatus ?? null;
+
+        // The app no longer reads statuscode for status, but it is still written
+        // (derived from the new fields) so Dataverse views, the active/inactive
+        // state, and downstream flows stay coherent.
+        const statusValue = deriveLegacyStatusCode(submissionStage, approvalStatus, buildStage);
         const body: DataverseRecord = {
           afp_title: input.title ?? existing?.title ?? '',
           afp_businessobjectives: input.businessObjectives ?? existing?.businessObjectives ?? '',
@@ -843,12 +872,15 @@ export function createRealDataProvider(): AppDataProvider {
           afp_datasourcenotes: input.dataSourceNotes ?? existing?.dataSourceNotes ?? '',
           afp_overallcostnoteshtml: input.overallCostNotesHtml ?? existing?.overallCostNotesHtml ?? '',
           afp_aiplatformselection: input.aiPlatformSelection ?? existing?.aiPlatformSelection ?? null,
+          afp_ideasubmissionstage: submissionStage,
+          afp_approvalstatus: approvalStatus,
+          afp_ideabuildstage: buildStage,
           statuscode: statusValue,
           // Dataverse rejects a statuscode that belongs to a different statecode
           // than the record currently has unless both are sent together. Always
           // include the matching statecode so transitions into Inactive statuses
           // (Approved/Rejected/Completed) persist instead of silently reverting.
-          statecode: IDEA_STATUS_STATECODE[statusValue] ?? IDEA_STATE.ACTIVE,
+          statecode: legacyStateForStatusCode(statusValue),
         };
 
         // Assigned reviewer is a systemuser lookup; only bind it when the caller

@@ -2,6 +2,7 @@ import { createHashRouter } from "react-router-dom"
 import { Navigate } from "react-router-dom"
 import Layout from "@/pages/_layout"
 import DashboardPage from "@/pages/dashboard"
+import BuildDashboardPage from "@/pages/build-dashboard"
 import SubmitIdeaPage from "@/pages/submit-idea"
 import MySubmissionsPage from "@/pages/my-submissions"
 import MyApprovalsPage from "@/pages/my-approvals"
@@ -35,6 +36,7 @@ export const router = createHashRouter([
     children: [
       { index: true, element: <Navigate to="/dashboard" replace /> },
       { path: "dashboard", element: <DashboardPage /> },
+      { path: "build", element: <BuildDashboardPage /> },
       { path: "submit", element: <SubmitIdeaPage /> },
       { path: "submit/:id", element: <SubmitIdeaPage /> },
       { path: "my-ideas", element: <MySubmissionsPage /> },

@@ -1,5 +1,8 @@
 import type { IdeaSubmission } from '@/types/domain-models';
 import { IDEA_STATUS } from '@/constants/ideaStatus';
+import { SUBMISSION_STAGE } from '@/constants/submissionStage';
+import { BUILD_STAGE } from '@/constants/buildStage';
+import { APPROVAL_STATUS } from '@/constants/approvalStatus';
 
 export const mockIdeaSubmissions: IdeaSubmission[] = [
   {
@@ -12,6 +15,9 @@ export const mockIdeaSubmissions: IdeaSubmission[] = [
     expectedOutcomes: 'Agents receive real-time AI-generated response suggestions. Supervisors see a reduction in escalations. Customer satisfaction scores improve by 15%.',
     riskFactors: 'Risk of incorrect AI suggestions leading to customer misinformation. Requires robust human-in-the-loop override mechanism.',
     status: IDEA_STATUS.DRAFT,
+    submissionStage: SUBMISSION_STAGE.DRAFT,
+    approvalStatus: null,
+    buildStage: null,
     department: 'Customer Experience',
     submittedBy: 'user-mock-1',
     createdOn: '2026-05-01',
@@ -26,6 +32,9 @@ export const mockIdeaSubmissions: IdeaSubmission[] = [
     expectedOutcomes: 'Reduce expense report processing time from 20 minutes to 3 minutes per submission. Decrease manual entry errors by 80%.',
     riskFactors: 'OCR accuracy on low-quality receipt images. Policy compliance enforcement must remain with human approvers.',
     status: IDEA_STATUS.SUBMITTED,
+    submissionStage: SUBMISSION_STAGE.SUBMITTED,
+    approvalStatus: null,
+    buildStage: null,
     department: 'Finance',
     normalizedDepartments: ['Finance'],
     submittedBy: 'user-mock-1',
@@ -41,6 +50,9 @@ export const mockIdeaSubmissions: IdeaSubmission[] = [
     expectedOutcomes: 'Reduce contract review time by 50%. Provide structured risk summary to legal reviewers within minutes of upload.',
     riskFactors: 'Legal liability if AI misclassifies a high-risk clause. Must be advisory only — no autonomous approval or signing.',
     status: IDEA_STATUS.UNDER_REVIEW,
+    submissionStage: SUBMISSION_STAGE.IN_REVIEW,
+    approvalStatus: null,
+    buildStage: null,
     department: 'Legal',
     normalizedDepartments: ['Legal', 'Procurement'],
     submittedBy: 'user-mock-1',
@@ -56,6 +68,9 @@ export const mockIdeaSubmissions: IdeaSubmission[] = [
     expectedOutcomes: 'New hire time-to-productivity reduced by 2 weeks. HR ticket volume for onboarding questions reduced by 40%.',
     riskFactors: 'Accuracy of HR policy answers must be maintained as policies change. Requires clear escalation path to HR for complex queries.',
     status: IDEA_STATUS.APPROVED,
+    submissionStage: SUBMISSION_STAGE.IN_REVIEW,
+    approvalStatus: APPROVAL_STATUS.APPROVED,
+    buildStage: null,
     department: 'Human Resources',
     normalizedDepartments: ['Human Resources'],
     submittedBy: 'user-mock-1',
@@ -71,6 +86,9 @@ export const mockIdeaSubmissions: IdeaSubmission[] = [
     expectedOutcomes: 'Real-time brand sentiment dashboard. Automatic alerts for negative sentiment spikes. Reduces manual monitoring hours by 20 per week.',
     riskFactors: 'External API terms of service compliance. Risk of false-positive crisis alerts causing unnecessary escalations.',
     status: IDEA_STATUS.REJECTED,
+    submissionStage: SUBMISSION_STAGE.IN_REVIEW,
+    approvalStatus: APPROVAL_STATUS.DENIED,
+    buildStage: null,
     department: 'Marketing',
     submittedBy: 'user-mock-2',
     createdOn: '2026-04-01',
@@ -85,6 +103,9 @@ export const mockIdeaSubmissions: IdeaSubmission[] = [
     expectedOutcomes: 'Reduce stockout incidents by 25%. Lower emergency procurement spend by 15% annually.',
     riskFactors: 'Model accuracy dependent on data quality and completeness of historical ERP records. Pending data governance review.',
     status: IDEA_STATUS.ON_HOLD,
+    submissionStage: SUBMISSION_STAGE.ON_HOLD,
+    approvalStatus: null,
+    buildStage: null,
     department: 'Procurement',
     submittedBy: 'user-mock-2',
     createdOn: '2026-03-28',
@@ -99,6 +120,9 @@ export const mockIdeaSubmissions: IdeaSubmission[] = [
     expectedOutcomes: 'Deflect 60% of tier-1 HR queries. HR team focus shifts to complex case work. 24/7 availability for policy questions.',
     riskFactors: 'Policy documents must be kept current. Regulatory compliance risk if outdated policy is cited.',
     status: IDEA_STATUS.IN_PROGRESS,
+    submissionStage: SUBMISSION_STAGE.IN_REVIEW,
+    approvalStatus: APPROVAL_STATUS.APPROVED,
+    buildStage: BUILD_STAGE.IN_PROGRESS,
     department: 'Human Resources',
     normalizedDepartments: ['Human Resources'],
     submittedBy: 'user-mock-2',
@@ -114,6 +138,9 @@ export const mockIdeaSubmissions: IdeaSubmission[] = [
     expectedOutcomes: 'Process 90% of standard invoices without human touch. Reduce processing cost per invoice by 60%. Eliminate late-payment penalties.',
     riskFactors: 'Fraud detection must remain human-reviewed. Vendor master data quality is a prerequisite.',
     status: IDEA_STATUS.COMPLETED,
+    submissionStage: SUBMISSION_STAGE.IN_REVIEW,
+    approvalStatus: APPROVAL_STATUS.APPROVED,
+    buildStage: BUILD_STAGE.COMPLETED,
     department: 'Finance',
     normalizedDepartments: ['Finance', 'Procurement'],
     submittedBy: 'user-mock-2',

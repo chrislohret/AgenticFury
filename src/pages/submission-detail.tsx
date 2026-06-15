@@ -55,7 +55,20 @@ import {
   useIdeaRealization,
   useSaveIdeaRealization,
 } from '@/hooks/usePrototypeData';
-import { IDEA_STATUS, IDEA_STATUS_LABELS, IDEA_STATUS_BADGE_VARIANT, getAllowedStatusOptions } from '@/constants/ideaStatus';
+import {
+  SUBMISSION_STAGE,
+  submissionStageLabel,
+  submissionStageBadgeVariant,
+  getAllowedSubmissionStages,
+  type SubmissionStageValue,
+} from '@/constants/submissionStage';
+import {
+  BUILD_STAGE,
+  buildStageLabel,
+  buildStageBadgeVariant,
+  getAllowedBuildStages,
+} from '@/constants/buildStage';
+import { approvalStatusLabel, approvalStatusBadgeVariant, APPROVAL_STATUS } from '@/constants/approvalStatus';
 import { getScoreBand } from '@/constants/scorecard';
 import { AI_PLATFORM_OPTIONS } from '@/constants/aiPlatform';
 import type {
@@ -437,8 +450,8 @@ const DETAIL_SECTIONS = [
   { id: 'section-realization', label: 'Realized Outcomes' },
 ] as const;
 
-// Realized outcomes are only relevant once an approved idea is being delivered.
-const REALIZATION_STATUSES: number[] = [IDEA_STATUS.IN_PROGRESS, IDEA_STATUS.COMPLETED];
+// Realized outcomes are only relevant once an approved idea is being built.
+const REALIZATION_BUILD_STAGES: number[] = [BUILD_STAGE.IN_PROGRESS, BUILD_STAGE.COMPLETED];
 
 const OUTCOME_RATING_OPTIONS: { value: IdeaOutcomeRating; label: string }[] = [
   { value: 747150000, label: 'Exceeded Expectations' },
@@ -481,6 +494,8 @@ export default function SubmissionDetailPage() {
   const [newNoteText, setNewNoteText] = useState('');
   const [approvalComments, setApprovalComments] = useState<Record<string, string>>({});
   const [selectedStatus, setSelectedStatus] = useState<number | null>(null);
+  const [selectedBuildStage, setSelectedBuildStage] = useState<number | null>(null);
+  const [selectedApproval, setSelectedApproval] = useState<number | null>(null);
   const [statusChangeReason, setStatusChangeReason] = useState('');
   const [titleDraft, setTitleDraft] = useState('');
   const [platformCarouselOpen, setPlatformCarouselOpen] = useState(false);
@@ -543,9 +558,17 @@ export default function SubmissionDetailPage() {
   }, [structuredReview]);
 
   useEffect(() => {
-    setSelectedStatus(submission?.status ?? null);
+    setSelectedStatus(submission?.submissionStage ?? null);
     setStatusChangeReason('');
-  }, [submission?.status]);
+  }, [submission?.submissionStage]);
+
+  useEffect(() => {
+    setSelectedBuildStage(submission?.buildStage ?? null);
+  }, [submission?.buildStage]);
+
+  useEffect(() => {
+    setSelectedApproval(submission?.approvalStatus ?? null);
+  }, [submission?.approvalStatus]);
 
   useEffect(() => {
     setTitleDraft(submission?.title ?? '');
@@ -666,7 +689,7 @@ export default function SubmissionDetailPage() {
     () => ({
       submissionId: submission?.id ?? '',
       title: submission?.title ?? 'Unknown submission',
-      statusLabel: IDEA_STATUS_LABELS[submission?.status ?? -1] ?? 'Unknown',
+      statusLabel: submissionStageLabel(submission?.submissionStage ?? null),
       department: submission?.department,
       phiRequired: submission?.phiRequired ?? false,
       monthlyCopilotCreditsCost: overallCostsForm.monthlyCopilotCreditsCost || undefined,
@@ -684,7 +707,7 @@ export default function SubmissionDetailPage() {
       submission?.department,
       submission?.id,
       submission?.phiRequired,
-      submission?.status,
+      submission?.submissionStage,
       submission?.title,
     ],
   );
@@ -757,6 +780,16 @@ export default function SubmissionDetailPage() {
     setSelectedStatus(Number(value));
   }
 
+  function handleBuildStageChange(value: string) {
+    markEdited();
+    setSelectedBuildStage(value === 'none' ? null : Number(value));
+  }
+
+  function handleApprovalChange(value: string) {
+    markEdited();
+    setSelectedApproval(value === 'pending' ? null : Number(value));
+  }
+
   async function handleAssignReviewer(memberSystemUserId: string) {
     if (!submission) return;
     const previous = assignedReviewerId;
@@ -804,18 +837,29 @@ export default function SubmissionDetailPage() {
     const structuredChanged =
       structuredFormKey(form) !== structuredFormKey(toStructuredForm(structuredReview ?? null));
 
-    const nextStatus = selectedStatus ?? submission.status;
-    const statusChanged = nextStatus !== submission.status;
-    if (statusChanged && !statusChangeReason.trim()) {
+    const nextStage = selectedStatus ?? submission.submissionStage ?? null;
+    const currentStage = submission.submissionStage ?? null;
+    const stageChanged = nextStage !== currentStage;
+    if (stageChanged && !statusChangeReason.trim()) {
       toast.error('Add a reason for the status change.');
       return false;
     }
+
+    const nextBuildStage = selectedBuildStage;
+    const currentBuildStage = submission.buildStage ?? null;
+    const buildStageChanged = nextBuildStage !== currentBuildStage;
+
+    const nextApproval = selectedApproval;
+    const currentApproval = submission.approvalStatus ?? null;
+    const approvalChanged = nextApproval !== currentApproval;
 
     try {
       await saveIdeaSubmission.mutateAsync({
         id: submission.id,
         title: titleDraft.trim() || submission.title,
-        status: selectedStatus ?? submission.status,
+        submissionStage: nextStage as SubmissionStageValue | null,
+        approvalStatus: nextApproval,
+        buildStage: nextBuildStage,
         // Only send the PDF when the user actually changed it. Re-sending the
         // downloaded data URL on every save forces a needless re-upload of the
         // afp_copilotcreditestimatorpdf File column, which can fail and abort the
@@ -848,20 +892,48 @@ export default function SubmissionDetailPage() {
         });
       }
 
-      if (statusChanged) {
-        const fromLabel = IDEA_STATUS_LABELS[submission.status] ?? `Status ${submission.status}`;
-        const toLabel = IDEA_STATUS_LABELS[nextStatus] ?? `Status ${nextStatus}`;
+      if (stageChanged) {
+        const fromLabel = submissionStageLabel(currentStage);
+        const toLabel = submissionStageLabel(nextStage);
         try {
           await createNote.mutateAsync({
             submissionId: relatedSubmissionId,
             subject: 'Status change',
-            noteText: `Status changed: ${fromLabel} → ${toLabel}. Reason: ${statusChangeReason.trim()}`,
+            noteText: `Submission stage changed: ${fromLabel} → ${toLabel}. Reason: ${statusChangeReason.trim()}`,
           });
         } catch {
           // The status itself saved; a failed activity note should not abort.
           toast.warning('Status saved, but the activity note could not be recorded.');
         }
         setStatusChangeReason('');
+      }
+
+      if (buildStageChanged) {
+        const fromLabel = buildStageLabel(currentBuildStage);
+        const toLabel = buildStageLabel(nextBuildStage);
+        try {
+          await createNote.mutateAsync({
+            submissionId: relatedSubmissionId,
+            subject: 'Build phase change',
+            noteText: `Build phase changed: ${fromLabel} → ${toLabel}.`,
+          });
+        } catch {
+          toast.warning('Build phase saved, but the activity note could not be recorded.');
+        }
+      }
+
+      if (approvalChanged) {
+        const fromLabel = approvalStatusLabel(currentApproval);
+        const toLabel = approvalStatusLabel(nextApproval);
+        try {
+          await createNote.mutateAsync({
+            submissionId: relatedSubmissionId,
+            subject: 'Approval decision change',
+            noteText: `Approval decision changed: ${fromLabel} → ${toLabel}.`,
+          });
+        } catch {
+          toast.warning('Approval decision saved, but the activity note could not be recorded.');
+        }
       }
 
       toast.success('Changes saved.');
@@ -1095,24 +1167,24 @@ export default function SubmissionDetailPage() {
               })()}
             </div>
             <div className="min-w-48 space-y-1.5">
-              <Label>Update submission status to:</Label>
+              <Label>Update submission stage to:</Label>
               <Select
-                value={String(selectedStatus ?? submission.status)}
+                value={String(selectedStatus ?? submission.submissionStage ?? SUBMISSION_STAGE.SUBMITTED)}
                 onValueChange={handleStatusChange}
                 disabled={saveIdeaSubmission.isPending}
               >
                 <SelectTrigger>
-                  <SelectValue placeholder="Select status" />
+                  <SelectValue placeholder="Select stage" />
                 </SelectTrigger>
                 <SelectContent>
-                  {getAllowedStatusOptions(submission.status).map((statusValue) => (
-                    <SelectItem key={statusValue} value={String(statusValue)}>
-                      {IDEA_STATUS_LABELS[statusValue] ?? `Status ${statusValue}`}
+                  {getAllowedSubmissionStages(submission.submissionStage ?? null).map((stageValue) => (
+                    <SelectItem key={stageValue} value={String(stageValue)}>
+                      {submissionStageLabel(stageValue)}
                     </SelectItem>
                   ))}
                 </SelectContent>
               </Select>
-              {selectedStatus != null && selectedStatus !== submission.status && (
+              {selectedStatus != null && selectedStatus !== (submission.submissionStage ?? null) && (
                 <div className="space-y-1">
                   <Label htmlFor="status-change-reason" className="text-xs">
                     Reason for status change<span className="text-destructive"> *</span>
@@ -1127,14 +1199,63 @@ export default function SubmissionDetailPage() {
                   />
                 </div>
               )}
+              <div className="space-y-1 pt-2">
+                <Label>Approval decision:</Label>
+                <Select
+                  value={selectedApproval == null ? 'pending' : String(selectedApproval)}
+                  onValueChange={handleApprovalChange}
+                  disabled={saveIdeaSubmission.isPending}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Select decision" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="pending">Pending</SelectItem>
+                    <SelectItem value={String(APPROVAL_STATUS.APPROVED)}>Approved</SelectItem>
+                    <SelectItem value={String(APPROVAL_STATUS.DENIED)}>Denied</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+              {selectedApproval === APPROVAL_STATUS.APPROVED && (
+                <div className="space-y-1 pt-2">
+                  <Label>Build phase:</Label>
+                  <Select
+                    value={selectedBuildStage == null ? 'none' : String(selectedBuildStage)}
+                    onValueChange={handleBuildStageChange}
+                    disabled={saveIdeaSubmission.isPending}
+                  >
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select build phase" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="none">Not started</SelectItem>
+                      {getAllowedBuildStages(submission.buildStage ?? null).map((stageValue) => (
+                        <SelectItem key={stageValue} value={String(stageValue)}>
+                          {buildStageLabel(stageValue)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              )}
             </div>
             <div className="space-y-1.5">
               <Label>Current Status</Label>
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {submission.phiRequired && <Badge variant="destructive">PHI</Badge>}
-                <Badge variant={IDEA_STATUS_BADGE_VARIANT[submission.status]}>
-                  {IDEA_STATUS_LABELS[submission.status] ?? 'Unknown'}
+                <Badge variant={submissionStageBadgeVariant(submission.submissionStage ?? null)}>
+                  {submissionStageLabel(submission.submissionStage ?? null)}
                 </Badge>
+                {submission.approvalStatus != null && (
+                  <Badge variant={approvalStatusBadgeVariant(submission.approvalStatus)}>
+                    {approvalStatusLabel(submission.approvalStatus)}
+                  </Badge>
+                )}
+                {submission.approvalStatus === APPROVAL_STATUS.APPROVED && (
+                  <Badge variant={buildStageBadgeVariant(submission.buildStage ?? null)}>
+                    {buildStageLabel(submission.buildStage ?? null)}
+                  </Badge>
+                )}
               </div>
             </div>
           </div>
@@ -1700,11 +1821,11 @@ export default function SubmissionDetailPage() {
             </p>
           </CardHeader>
           <CardContent>
-            {!REALIZATION_STATUSES.includes(submission.status) ? (
+            {!REALIZATION_BUILD_STAGES.includes(submission.buildStage ?? -1) ? (
               <p className="text-sm text-muted-foreground">
-                Realized outcomes become editable once this idea reaches <strong>In Progress</strong> or{' '}
-                <strong>Completed</strong>. Current status:{' '}
-                {IDEA_STATUS_LABELS[submission.status] ?? 'Unknown'}.
+                Realized outcomes become editable once this idea's build phase reaches{' '}
+                <strong>In Progress</strong> or <strong>Completed</strong>. Current build phase:{' '}
+                {buildStageLabel(submission.buildStage ?? null)}.
               </p>
             ) : (
               <div className="space-y-4">

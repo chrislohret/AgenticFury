@@ -7,7 +7,8 @@ const navSections = [
   {
     title: "Ideas",
     items: [
-      { to: "/dashboard", label: "Dashboard" },
+      { to: "/dashboard", label: "Submission Status" },
+      { to: "/build", label: "Build Phases" },
       { to: "/analytics", label: "Analytics", adminOnly: true },
       { to: "/submit", label: "Submit Idea" },
     ],

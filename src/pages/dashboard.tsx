@@ -1,127 +1,67 @@
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { Input } from '@/components/ui/input';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { useIdeaSubmissions } from '@/hooks/usePrototypeData';
-import { IDEA_STATUS, IDEA_STATUS_LABELS, IDEA_STATUS_BADGE_VARIANT } from '@/constants/ideaStatus';
+import { IdeaListPanel, StatusCard } from '@/components/IdeaListPanel';
+import {
+  SUBMISSION_STAGE,
+  SUBMISSION_STAGE_DRAFT,
+  submissionStageLabel,
+  submissionStageBadgeVariant,
+} from '@/constants/submissionStage';
+import {
+  APPROVAL_STATUS,
+  approvalStatusLabel,
+  approvalStatusBadgeVariant,
+} from '@/constants/approvalStatus';
+import type { IdeaSubmission } from '@/types/domain-models';
 
 type DashboardFilter =
   | 'all'
   | 'submitted'
   | 'underReview'
+  | 'onHold'
   | 'approved'
-  | 'rejected'
-  | 'phiFlagged';
+  | 'denied';
 
-type SortKey = 'newest' | 'oldest' | 'title' | 'status';
-
-function StatusCard({
-  label,
-  count,
-  color,
-  isActive,
-  onClick,
-}: {
-  label: string;
-  count: number;
-  color: string;
-  isActive: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      className="text-left rounded-lg focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-      aria-pressed={isActive}
-      aria-label={`Filter recent submissions by ${label}`}
-    >
-      <Card className={isActive ? 'ring-2 ring-ring border-ring' : ''}>
-        <CardHeader className="pb-2">
-          <CardTitle className="text-sm font-medium text-muted-foreground">{label}</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className={`text-3xl font-bold ${color}`}>{count}</p>
-        </CardContent>
-      </Card>
-    </button>
-  );
+function stageOf(s: IdeaSubmission): number | null {
+  return s.submissionStage ?? SUBMISSION_STAGE_DRAFT;
 }
 
 export default function DashboardPage() {
   const { data: submissions, isLoading } = useIdeaSubmissions();
   const [activeFilter, setActiveFilter] = useState<DashboardFilter>('all');
-  const [search, setSearch] = useState('');
-  const [sortKey, setSortKey] = useState<SortKey>('newest');
 
   const counts = {
     total: submissions?.length ?? 0,
-    draft: submissions?.filter((s) => s.status === IDEA_STATUS.DRAFT).length ?? 0,
-    submitted: submissions?.filter((s) => s.status === IDEA_STATUS.SUBMITTED).length ?? 0,
-    underReview: submissions?.filter((s) => s.status === IDEA_STATUS.UNDER_REVIEW).length ?? 0,
-    approved: submissions?.filter((s) => s.status === IDEA_STATUS.APPROVED).length ?? 0,
-    rejected: submissions?.filter((s) => s.status === IDEA_STATUS.REJECTED).length ?? 0,
-    phiFlagged: submissions?.filter((s) => s.phiRequired).length ?? 0,
+    submitted: submissions?.filter((s) => stageOf(s) === SUBMISSION_STAGE.SUBMITTED).length ?? 0,
+    underReview: submissions?.filter((s) => stageOf(s) === SUBMISSION_STAGE.IN_REVIEW).length ?? 0,
+    onHold: submissions?.filter((s) => stageOf(s) === SUBMISSION_STAGE.ON_HOLD).length ?? 0,
+    approved: submissions?.filter((s) => s.approvalStatus === APPROVAL_STATUS.APPROVED).length ?? 0,
+    denied: submissions?.filter((s) => s.approvalStatus === APPROVAL_STATUS.DENIED).length ?? 0,
   };
 
   const filteredSubmissions = useMemo(() => {
     const source = submissions ?? [];
     switch (activeFilter) {
       case 'submitted':
-        return source.filter((s) => s.status === IDEA_STATUS.SUBMITTED);
+        return source.filter((s) => stageOf(s) === SUBMISSION_STAGE.SUBMITTED);
       case 'underReview':
-        return source.filter((s) => s.status === IDEA_STATUS.UNDER_REVIEW);
+        return source.filter((s) => stageOf(s) === SUBMISSION_STAGE.IN_REVIEW);
+      case 'onHold':
+        return source.filter((s) => stageOf(s) === SUBMISSION_STAGE.ON_HOLD);
       case 'approved':
-        return source.filter((s) => s.status === IDEA_STATUS.APPROVED);
-      case 'rejected':
-        return source.filter((s) => s.status === IDEA_STATUS.REJECTED);
-      case 'phiFlagged':
-        return source.filter((s) => s.phiRequired);
+        return source.filter((s) => s.approvalStatus === APPROVAL_STATUS.APPROVED);
+      case 'denied':
+        return source.filter((s) => s.approvalStatus === APPROVAL_STATUS.DENIED);
       case 'all':
       default:
         return source;
     }
   }, [submissions, activeFilter]);
-
-  const visibleSubmissions = useMemo(() => {
-    let list = [...filteredSubmissions];
-    const q = search.trim().toLowerCase();
-    if (q) {
-      list = list.filter(
-        (s) =>
-          s.title?.toLowerCase().includes(q) ||
-          s.department?.toLowerCase().includes(q),
-      );
-    }
-    switch (sortKey) {
-      case 'oldest':
-        list.sort((a, b) => (a.createdOn ?? '').localeCompare(b.createdOn ?? ''));
-        break;
-      case 'title':
-        list.sort((a, b) => (a.title ?? '').localeCompare(b.title ?? ''));
-        break;
-      case 'status':
-        list.sort((a, b) => a.status - b.status);
-        break;
-      case 'newest':
-      default:
-        list.sort((a, b) => (b.createdOn ?? '').localeCompare(a.createdOn ?? ''));
-    }
-    return list;
-  }, [filteredSubmissions, search, sortKey]);
-
-  const isNarrowed = Boolean(search.trim()) || activeFilter !== 'all';
-  const displayedSubmissions = isNarrowed ? visibleSubmissions : visibleSubmissions.slice(0, 6);
 
   function handleFilterClick(nextFilter: DashboardFilter) {
     setActiveFilter((current) => (current === nextFilter ? 'all' : nextFilter));
@@ -131,8 +71,8 @@ export default function DashboardPage() {
     <div className="p-6 space-y-6">
       <div className="flex items-start justify-between gap-3">
         <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-1">Agentic AI use case pipeline overview</p>
+          <h1 className="text-2xl font-semibold tracking-tight">Submission Status</h1>
+          <p className="text-sm text-muted-foreground mt-1">Agentic AI use case submission pipeline overview</p>
         </div>
         <Button asChild variant="outline">
           <Link to="/my-ideas">My Ideas</Link>
@@ -162,11 +102,18 @@ export default function DashboardPage() {
             onClick={() => handleFilterClick('submitted')}
           />
           <StatusCard
-            label="Under Review"
+            label="In Review"
             count={counts.underReview}
             color="text-yellow-600"
             isActive={activeFilter === 'underReview'}
             onClick={() => handleFilterClick('underReview')}
+          />
+          <StatusCard
+            label="On Hold"
+            count={counts.onHold}
+            color="text-orange-600"
+            isActive={activeFilter === 'onHold'}
+            onClick={() => handleFilterClick('onHold')}
           />
           <StatusCard
             label="Approved"
@@ -176,83 +123,38 @@ export default function DashboardPage() {
             onClick={() => handleFilterClick('approved')}
           />
           <StatusCard
-            label="Rejected"
-            count={counts.rejected}
+            label="Denied"
+            count={counts.denied}
             color="text-red-600"
-            isActive={activeFilter === 'rejected'}
-            onClick={() => handleFilterClick('rejected')}
-          />
-          <StatusCard
-            label="PHI Flagged"
-            count={counts.phiFlagged}
-            color="text-orange-600"
-            isActive={activeFilter === 'phiFlagged'}
-            onClick={() => handleFilterClick('phiFlagged')}
+            isActive={activeFilter === 'denied'}
+            onClick={() => handleFilterClick('denied')}
           />
         </div>
       )}
 
-      <div>
-        <div className="flex flex-wrap items-center justify-between gap-3 mb-3">
-          <h2 className="text-lg font-semibold">
-            {isNarrowed ? 'Matching Submissions' : 'Recent Submissions'}
-          </h2>
-          <div className="flex items-center gap-2">
-            <Input
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search title or department…"
-              className="h-8 w-56"
-              aria-label="Search submissions by title or department"
-            />
-            <Select value={sortKey} onValueChange={(v) => setSortKey(v as SortKey)}>
-              <SelectTrigger className="h-8 w-36" aria-label="Sort submissions">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="newest">Newest first</SelectItem>
-                <SelectItem value="oldest">Oldest first</SelectItem>
-                <SelectItem value="title">Title (A–Z)</SelectItem>
-                <SelectItem value="status">Status</SelectItem>
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
-        {isLoading ? (
-          <div className="space-y-2">
-            {Array.from({ length: 4 }).map((_, i) => (
-              <Skeleton key={i} className="h-14 w-full" />
-            ))}
-          </div>
-        ) : displayedSubmissions.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            {isNarrowed ? 'No submissions match your search or filter.' : 'No submissions yet.'}
-          </p>
-        ) : (
-          <div className="rounded-md border divide-y">
-            {displayedSubmissions.map((submission) => (
-              <Link
-                key={submission.id}
-                to={`/submissions/${submission.id}`}
-                className="flex items-center justify-between px-4 py-3 hover:bg-muted/50 transition-colors"
-              >
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">{submission.title}</p>
-                  <p className="text-xs text-muted-foreground">{submission.department} · {submission.createdOn}</p>
-                </div>
-                <div className="flex items-center gap-2 ml-4 shrink-0">
-                  {submission.phiRequired && (
-                    <Badge variant="destructive" className="text-xs">PHI</Badge>
-                  )}
-                  <Badge variant={IDEA_STATUS_BADGE_VARIANT[submission.status]}>
-                    {IDEA_STATUS_LABELS[submission.status] ?? 'Unknown'}
-                  </Badge>
-                </div>
-              </Link>
-            ))}
-          </div>
-        )}
-      </div>
+      <IdeaListPanel
+        submissions={filteredSubmissions}
+        isLoading={isLoading}
+        isNarrowed={activeFilter !== 'all'}
+        statusSortLabel="Stage"
+        sortValue={(s) => stageOf(s) ?? -1}
+        renderBadge={(submission) => {
+          const stage = stageOf(submission);
+          return (
+            <>
+              <Badge variant={submissionStageBadgeVariant(stage)}>
+                {submissionStageLabel(stage)}
+              </Badge>
+              {submission.approvalStatus != null && (
+                <Badge variant={approvalStatusBadgeVariant(submission.approvalStatus)}>
+                  {approvalStatusLabel(submission.approvalStatus)}
+                </Badge>
+              )}
+            </>
+          );
+        }}
+      />
     </div>
   );
 }
+

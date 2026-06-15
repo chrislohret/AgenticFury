@@ -60,10 +60,10 @@ function createIdeaSubmissionRepository(records: IdeaSubmission[]): IdeaSubmissi
     },
     async listPendingForStage(_stage: ApprovalStage) {
       // Returns submitted/under-review ideas regardless of stage for prototype
-      const SUBMITTED = 100000001;
-      const UNDER_REVIEW = 100000002;
+      const SUBMITTED = 747150003;
+      const IN_REVIEW = 747150000;
       return records
-        .filter((r) => r.status === SUBMITTED || r.status === UNDER_REVIEW)
+        .filter((r) => r.submissionStage === SUBMITTED || r.submissionStage === IN_REVIEW)
         .map(cloneRecord);
     },
     async getById(id: string) {
@@ -86,6 +86,9 @@ function createIdeaSubmissionRepository(records: IdeaSubmission[]): IdeaSubmissi
         phiRequired: false,
         expectedOutcomes: '',
         status: 100000000,
+        submissionStage: 747150004,
+        approvalStatus: null,
+        buildStage: null,
         createdOn: new Date().toISOString().split('T')[0],
         submittedBy: 'user-mock-1',
         ...input,

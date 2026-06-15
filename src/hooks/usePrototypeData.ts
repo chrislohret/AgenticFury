@@ -18,6 +18,7 @@ import type {
   IdeaRealization,
 } from '@/types/domain-models';
 import type { ScorecardDimensionKey } from '@/constants/scorecard';
+import { SUBMISSION_STAGE } from '@/constants/submissionStage';
 
 const provider = createAppDataProvider();
 
@@ -97,7 +98,9 @@ export function useSaveIdeaSubmission() {
       queryClient.setQueryData<IdeaSubmission[]>(
         queryKeys.ideaSubmissionsPendingForStage('coe-review'),
         (old) => {
-          const qualifies = merged.status === 100000001 || merged.status === 100000002;
+          const qualifies =
+            merged.submissionStage === SUBMISSION_STAGE.SUBMITTED ||
+            merged.submissionStage === SUBMISSION_STAGE.IN_REVIEW;
           const current = old ?? [];
           const without = current.filter((item) => item.id !== merged.id);
           return qualifies ? [merged, ...without] : without;

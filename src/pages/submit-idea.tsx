@@ -10,6 +10,7 @@ import { toast } from 'sonner';
 import { useIdeaSubmission, useSaveIdeaSubmission } from '@/hooks/usePrototypeData';
 import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { IDEA_STATUS } from '@/constants/ideaStatus';
+import { SUBMISSION_STAGE, SUBMISSION_STAGE_DRAFT, type SubmissionStageValue } from '@/constants/submissionStage';
 import type { IdeaSubmission } from '@/types/domain-models';
 
 type FormState = Omit<IdeaSubmission, 'id' | 'submittedBy' | 'createdOn'>;
@@ -41,7 +42,7 @@ export default function SubmitIdeaPage() {
 
   const isReadOnlyDraftByAnotherUser = Boolean(
     existing
-      && existing.status === IDEA_STATUS.DRAFT
+      && (existing.submissionStage ?? SUBMISSION_STAGE_DRAFT) === SUBMISSION_STAGE_DRAFT
       && existing.submittedBy
       && currentUser?.id
       && existing.submittedBy !== currentUser.id,
@@ -67,7 +68,7 @@ export default function SubmitIdeaPage() {
 
   const isDraftDisabled = save.isPending;
 
-  async function handleSave(status: number) {
+  async function handleSave(submissionStage: SubmissionStageValue | null) {
     if (!currentUser?.id) {
       toast.error('Unable to resolve the current user.');
       return;
@@ -81,11 +82,13 @@ export default function SubmitIdeaPage() {
     try {
       await save.mutateAsync({
         ...form,
-        status,
+        submissionStage,
         submittedBy: currentUser.id,
         ...(id ? { id } : {}),
       });
-      toast.success(status === IDEA_STATUS.DRAFT ? 'Saved as draft.' : 'Idea submitted successfully.');
+      toast.success(
+        submissionStage === SUBMISSION_STAGE_DRAFT ? 'Saved as draft.' : 'Idea submitted successfully.',
+      );
       navigate('/dashboard');
     } catch (error) {
       toast.error(error instanceof Error ? `Failed to save: ${error.message}` : 'Failed to save. Please try again.');
@@ -224,13 +227,13 @@ export default function SubmitIdeaPage() {
       <div className="flex gap-3 mt-6">
         <Button
           variant="outline"
-          onClick={() => handleSave(IDEA_STATUS.DRAFT)}
+          onClick={() => handleSave(SUBMISSION_STAGE_DRAFT)}
           disabled={isDraftDisabled || isReadOnlyDraftByAnotherUser || actionDisabled}
         >
           Save as Draft
         </Button>
         <Button
-          onClick={() => handleSave(IDEA_STATUS.SUBMITTED)}
+          onClick={() => handleSave(SUBMISSION_STAGE.SUBMITTED)}
           disabled={isSubmitDisabled || isReadOnlyDraftByAnotherUser || actionDisabled}
         >
           Submit Idea
