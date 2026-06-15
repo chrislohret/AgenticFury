@@ -82,11 +82,14 @@ export function SubmissionProcessFlow({
   onReasonChange,
   disabled,
 }: SubmissionProcessFlowProps) {
-  // The user "selected" values represent intent; fall back to the committed
-  // value, then to the Draft/Pending/Not-started defaults.
+  // The "selected" values represent the user's pending intent and are kept in
+  // sync with the committed record by the parent, so they are the source of
+  // truth here. Note: `null` is a *meaningful* selection (Pending / Not started),
+  // so we must NOT coalesce it back to the committed value — doing so would make
+  // those two choices un-selectable. Only `stage` carries a Draft default.
   const stage = selectedStage ?? submissionStage ?? SUBMISSION_STAGE.DRAFT;
-  const approval = selectedApproval ?? approvalStatus;
-  const build = selectedBuildStage ?? buildStage;
+  const approval = selectedApproval;
+  const build = selectedBuildStage;
 
   const approvalDecided = approval != null;
   const approved = approval === APPROVAL_STATUS.APPROVED;
