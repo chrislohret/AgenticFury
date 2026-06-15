@@ -20,6 +20,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { CopilotAssistantPanel } from '@/components/copilot-assistant-panel';
+import { SubmissionProcessFlow } from '@/components/SubmissionProcessFlow';
 // Inlined as a base64 data URL via vite.config.ts `build.assetsInlineLimit`.
 // A separate hashed asset file would be fetched through the Power Apps storage
 // proxy at runtime, which is unreliable inside the host iframe (the image
@@ -56,19 +57,14 @@ import {
   useSaveIdeaRealization,
 } from '@/hooks/usePrototypeData';
 import {
-  SUBMISSION_STAGE,
   submissionStageLabel,
-  submissionStageBadgeVariant,
-  getAllowedSubmissionStages,
   type SubmissionStageValue,
 } from '@/constants/submissionStage';
 import {
   BUILD_STAGE,
   buildStageLabel,
-  buildStageBadgeVariant,
-  getAllowedBuildStages,
 } from '@/constants/buildStage';
-import { approvalStatusLabel, approvalStatusBadgeVariant, APPROVAL_STATUS } from '@/constants/approvalStatus';
+import { approvalStatusLabel } from '@/constants/approvalStatus';
 import { getScoreBand } from '@/constants/scorecard';
 import { AI_PLATFORM_OPTIONS } from '@/constants/aiPlatform';
 import type {
@@ -1143,8 +1139,13 @@ export default function SubmissionDetailPage() {
           <Link to="/dashboard">← Back to Dashboard</Link>
         </Button>
         <div className="flex items-start justify-between gap-4">
-          <h1 className="text-2xl font-semibold tracking-tight">{submission.title}</h1>
-          <div className="flex items-start gap-4 shrink-0 rounded-lg border bg-card p-3">
+          <div className="min-w-0 space-y-1">
+            <div className="flex items-center gap-2">
+              <h1 className="text-2xl font-semibold tracking-tight">{submission.title}</h1>
+              {submission.phiRequired && <Badge variant="destructive">PHI</Badge>}
+            </div>
+          </div>
+          <div className="flex items-start gap-2 shrink-0 rounded-lg border bg-card p-3">
             <div className="space-y-1.5">
               <Label>Scorecard</Label>
               <Button variant="outline" size="sm" asChild>
@@ -1166,98 +1167,6 @@ export default function SubmissionDetailPage() {
                 ) : null;
               })()}
             </div>
-            <div className="min-w-48 space-y-1.5">
-              <Label>Update submission stage to:</Label>
-              <Select
-                value={String(selectedStatus ?? submission.submissionStage ?? SUBMISSION_STAGE.SUBMITTED)}
-                onValueChange={handleStatusChange}
-                disabled={saveIdeaSubmission.isPending}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Select stage" />
-                </SelectTrigger>
-                <SelectContent>
-                  {getAllowedSubmissionStages(submission.submissionStage ?? null).map((stageValue) => (
-                    <SelectItem key={stageValue} value={String(stageValue)}>
-                      {submissionStageLabel(stageValue)}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              {selectedStatus != null && selectedStatus !== (submission.submissionStage ?? null) && (
-                <div className="space-y-1">
-                  <Label htmlFor="status-change-reason" className="text-xs">
-                    Reason for status change<span className="text-destructive"> *</span>
-                  </Label>
-                  <Textarea
-                    id="status-change-reason"
-                    rows={2}
-                    value={statusChangeReason}
-                    onChange={(e) => setStatusChangeReason(e.target.value)}
-                    placeholder="Explain why the status is changing. Captured in the activity notes."
-                    aria-required
-                  />
-                </div>
-              )}
-              <div className="space-y-1 pt-2">
-                <Label>Approval decision:</Label>
-                <Select
-                  value={selectedApproval == null ? 'pending' : String(selectedApproval)}
-                  onValueChange={handleApprovalChange}
-                  disabled={saveIdeaSubmission.isPending}
-                >
-                  <SelectTrigger>
-                    <SelectValue placeholder="Select decision" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="pending">Pending</SelectItem>
-                    <SelectItem value={String(APPROVAL_STATUS.APPROVED)}>Approved</SelectItem>
-                    <SelectItem value={String(APPROVAL_STATUS.DENIED)}>Denied</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-              {selectedApproval === APPROVAL_STATUS.APPROVED && (
-                <div className="space-y-1 pt-2">
-                  <Label>Build phase:</Label>
-                  <Select
-                    value={selectedBuildStage == null ? 'none' : String(selectedBuildStage)}
-                    onValueChange={handleBuildStageChange}
-                    disabled={saveIdeaSubmission.isPending}
-                  >
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select build phase" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">Not started</SelectItem>
-                      {getAllowedBuildStages(submission.buildStage ?? null).map((stageValue) => (
-                        <SelectItem key={stageValue} value={String(stageValue)}>
-                          {buildStageLabel(stageValue)}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
-            </div>
-            <div className="space-y-1.5">
-              <Label>Current Status</Label>
-              <div className="flex items-center gap-2 flex-wrap">
-                {submission.phiRequired && <Badge variant="destructive">PHI</Badge>}
-                <Badge variant={submissionStageBadgeVariant(submission.submissionStage ?? null)}>
-                  {submissionStageLabel(submission.submissionStage ?? null)}
-                </Badge>
-                {submission.approvalStatus != null && (
-                  <Badge variant={approvalStatusBadgeVariant(submission.approvalStatus)}>
-                    {approvalStatusLabel(submission.approvalStatus)}
-                  </Badge>
-                )}
-                {submission.approvalStatus === APPROVAL_STATUS.APPROVED && (
-                  <Badge variant={buildStageBadgeVariant(submission.buildStage ?? null)}>
-                    {buildStageLabel(submission.buildStage ?? null)}
-                  </Badge>
-                )}
-              </div>
-            </div>
           </div>
         </div>
         <p className="text-xs text-muted-foreground mt-1">
@@ -1265,6 +1174,22 @@ export default function SubmissionDetailPage() {
           Submitted {submission.createdOn ?? 'unknown'}
           {assignedReviewerLabel && ` · Reviewer: ${assignedReviewerLabel}`}
         </p>
+        <div className="mt-4">
+          <SubmissionProcessFlow
+            submissionStage={submission.submissionStage ?? null}
+            approvalStatus={submission.approvalStatus ?? null}
+            buildStage={submission.buildStage ?? null}
+            selectedStage={selectedStatus}
+            selectedApproval={selectedApproval}
+            selectedBuildStage={selectedBuildStage}
+            onStageChange={handleStatusChange}
+            onApprovalChange={handleApprovalChange}
+            onBuildChange={handleBuildStageChange}
+            statusChangeReason={statusChangeReason}
+            onReasonChange={setStatusChangeReason}
+            disabled={saveIdeaSubmission.isPending}
+          />
+        </div>
       </div>
 
       <div className="sticky top-12 z-10 -mx-6 flex flex-wrap items-center gap-2 border-b bg-background/95 px-6 py-2 backdrop-blur supports-[backdrop-filter]:bg-background/80">
