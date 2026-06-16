@@ -41,6 +41,7 @@ export const queryKeys = {
   ideaRealizationBySubmission: (submissionId: string) => ['ideaRealization', submissionId] as const,
   directoryUsers: ['directoryUsers'] as const,
   currentUserTeams: ['currentUser', 'teams'] as const,
+  powerPlatformEnvironments: ['powerPlatformEnvironments'] as const,
 };
 
 export function useIdeaSubmissions() {
@@ -342,6 +343,15 @@ export function useDirectoryUsers() {
     queryKey: queryKeys.directoryUsers,
     queryFn: () => provider.directoryUsers.list(),
     staleTime: 30 * 60 * 1000,
+  });
+}
+
+export function usePowerPlatformEnvironments(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.powerPlatformEnvironments,
+    queryFn: () => provider.powerPlatformEnvironments.list(),
+    staleTime: 30 * 60 * 1000,
+    enabled,
   });
 }
 

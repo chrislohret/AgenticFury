@@ -13,6 +13,7 @@ import type {
   AiCoeTeamApprovalRepository,
   ScorecardWeightRepository,
   IdeaRealizationRepository,
+  PowerPlatformEnvironmentRepository,
 } from '@/services/data-contracts';
 import type {
   IdeaSubmission,
@@ -31,6 +32,7 @@ import type {
   ScorecardWeight,
   IdeaRealization,
 } from '@/types/domain-models';
+import type { PowerPlatformEnvironment } from '@/types/domain-models';
 import { AI_COE_FULL_TEAM_NAME } from '@/constants/security';
 import { mockIdeaSubmissions } from '@/mockData/ideaSubmission';
 import { mockApprovalStageRecords } from '@/mockData/approvalStageRecord';
@@ -383,6 +385,22 @@ function createDirectoryUserRepository(users: DirectoryUser[]): DirectoryUserRep
   };
 }
 
+const MOCK_POWER_PLATFORM_ENVIRONMENTS: PowerPlatformEnvironment[] = [
+  { id: 'env-zone1-a', name: 'Citizen Dev (Zone 1)', environmentZone: 747150000 },
+  { id: 'env-zone1-b', name: 'Citizen Sandbox (Zone 1)', environmentZone: 747150000 },
+  { id: 'env-zone2-a', name: 'IT Partnered Dev (Zone 2)', environmentZone: 747150001 },
+  { id: 'env-zone2-b', name: 'IT Partnered Test (Zone 2)', environmentZone: 747150001 },
+  { id: 'env-zone3-a', name: 'IT Dev (Zone 3)', environmentZone: 747150002 },
+  { id: 'env-zone3-b', name: 'IT Prod (Zone 3)', environmentZone: 747150002 },
+];
+
+function createPowerPlatformEnvironmentRepository(): PowerPlatformEnvironmentRepository {
+  return {
+    async list() {
+      return MOCK_POWER_PLATFORM_ENVIRONMENTS.map(cloneRecord);
+    },
+  };
+}
 function createAiCoeRoleRepository(roles: LookupOption[]): AiCoeRoleRepository {
   return {
     async list(): Promise<AiCoeRole[]> {
@@ -517,8 +535,7 @@ export function createMockDataProvider(): AppDataProvider {
     aiCoeTeam: createAiCoeTeamRepository(teamStore),
     aiCoeTeamApprovals: createAiCoeTeamApprovalRepository(approvalStore),
     ideaRealizations: createIdeaRealizationRepository(realizationStore),
-    directoryUsers: createDirectoryUserRepository(usersStore),
-    currentUser: {
+    directoryUsers: createDirectoryUserRepository(usersStore),    currentUser: {
       // Mock mode treats the local user as a member of the AI CoE Team Full
       // team so admin-only navigation is exercisable during prototype dev.
       async getTeamNames() {
@@ -528,5 +545,6 @@ export function createMockDataProvider(): AppDataProvider {
     fieldMetadata: {
       async getField() { return null; },
     },
+    powerPlatformEnvironments: createPowerPlatformEnvironmentRepository(),
   } satisfies AppDataProvider;
 }

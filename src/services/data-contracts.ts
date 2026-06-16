@@ -15,6 +15,7 @@ import type {
   ScorecardWeight,
   IdeaRealization,
 } from '@/types/domain-models';
+import type { PowerPlatformEnvironment } from '@/types/domain-models';
 import type { ScorecardDimensionKey } from '@/constants/scorecard';
 
 export type DataverseFieldRequiredLevel = 'none' | 'recommended' | 'application' | 'system';
@@ -116,6 +117,13 @@ export interface AiCoeRoleRepository {
 }
 
 /**
+ * Read-only reference list of provisioned Power Platform environments
+ * (afp_powerplatenvironments). The UI filters the returned list by zone.
+ */
+export interface PowerPlatformEnvironmentRepository {
+  list(): Promise<PowerPlatformEnvironment[]>;
+}
+/**
  * Configurable per-dimension scorecard weights (one row per dimension).
  * `saveWeights` upserts every supplied dimension and returns the full set.
  * The app validates that weights sum to 100 before calling `saveWeights`.
@@ -164,4 +172,5 @@ export interface AppDataProvider {
   directoryUsers: DirectoryUserRepository;
   currentUser: CurrentUserRepository;
   fieldMetadata: FieldMetadataRepository;
+  powerPlatformEnvironments: PowerPlatformEnvironmentRepository;
 }

@@ -39,6 +39,14 @@ export interface IdeaSubmission {
    * platform is Copilot Studio; cleared to null otherwise.
    */
   environmentZone?: number | null;
+  /**
+   * Selected Power Platform environment (afp_powerplatformenvironment lookup to
+   * afp_powerplatenvironments). Only meaningful when the AI platform is Copilot
+   * Studio and a zone is selected; cleared otherwise.
+   */
+  powerPlatformEnvironmentId?: string | null;
+  /** Display name (afp_newcolumn) of the selected Power Platform environment. */
+  powerPlatformEnvironmentName?: string | null;
   status: number;
   /**
    * Submission stage (afp_ideasubmissionstage): Submitted, In Review, On Hold,
@@ -102,6 +110,18 @@ export interface AiCoeRole {
   id: string;
   name: string;
   description?: string;
+}
+
+/**
+ * A provisioned Power Platform environment (afp_powerplatenvironments). Selected
+ * on an idea via the afp_powerplatformenvironment lookup, filtered by zone.
+ */
+export interface PowerPlatformEnvironment {
+  id: string;
+  /** Display name (afp_newcolumn). */
+  name: string;
+  /** Environment zone (afp_environmentzone choice) this environment belongs to. */
+  environmentZone: number | null;
 }
 
 export interface AiCoeTeamMember {

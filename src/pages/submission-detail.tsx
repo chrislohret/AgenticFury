@@ -55,6 +55,7 @@ import {
   useDeleteAiCoeTeamApproval,
   useIdeaRealization,
   useSaveIdeaRealization,
+  usePowerPlatformEnvironments,
 } from '@/hooks/usePrototypeData';
 import {
   submissionStageLabel,
@@ -486,6 +487,7 @@ export default function SubmissionDetailPage() {
   const riskFactorOptions = useLookupOptions('risk-factors', canLoadRelatedData);
   const departmentOptions = useLookupOptions('departments', canLoadRelatedData);
   const aiCoeRoleOptions = useAiCoeRoles(canLoadRelatedData);
+  const powerPlatformEnvironments = usePowerPlatformEnvironments(canLoadRelatedData);
 
   const [form, setForm] = useState<StructuredFormState>(EMPTY_STRUCTURED_FORM);
   const [newNoteText, setNewNoteText] = useState('');
@@ -504,6 +506,7 @@ export default function SubmissionDetailPage() {
   const [overallCostsForm, setOverallCostsForm] = useState<OverallCostsFormState>(EMPTY_OVERALL_COSTS_FORM);
   const [platformSelection, setPlatformSelection] = useState<string>('');
   const [environmentZone, setEnvironmentZone] = useState<string>('');
+  const [powerPlatformEnvironmentId, setPowerPlatformEnvironmentId] = useState<string>('');
   const [assignedReviewerId, setAssignedReviewerId] = useState<string>('');
   const [realizationForm, setRealizationForm] = useState({
     actualMonthlyCost: '',
@@ -606,6 +609,9 @@ export default function SubmissionDetailPage() {
     setEnvironmentZone(
       submission?.environmentZone != null ? String(submission.environmentZone) : '',
     );
+    setPowerPlatformEnvironmentId(
+      submission?.powerPlatformEnvironmentId ? String(submission.powerPlatformEnvironmentId) : '',
+    );
   }, [
     submission?.monthlyCopilotCreditsCost,
     submission?.monthlyCopilotCreditsNotes,
@@ -615,6 +621,7 @@ export default function SubmissionDetailPage() {
     submission?.dataSourceNotes,
     submission?.aiPlatformSelection,
     submission?.environmentZone,
+    submission?.powerPlatformEnvironmentId,
   ]);
 
   const activeBusinessObjectiveOptions = useMemo(
@@ -886,6 +893,10 @@ export default function SubmissionDetailPage() {
         aiPlatformSelection: platformSelection ? Number(platformSelection) : undefined,
         environmentZone:
           Number(platformSelection) === 747150001 && environmentZone ? Number(environmentZone) : null,
+        powerPlatformEnvironmentId:
+          Number(platformSelection) === 747150001 && environmentZone && powerPlatformEnvironmentId
+            ? powerPlatformEnvironmentId
+            : null,
       });
 
       if (structuredChanged) {
@@ -1377,7 +1388,14 @@ export default function SubmissionDetailPage() {
               <Label htmlFor="ai-platform-selection">AI Platform</Label>
               <Select
                 value={platformSelection}
-                onValueChange={(value) => { markEdited(); setPlatformSelection(value); }}
+                onValueChange={(value) => {
+                  markEdited();
+                  setPlatformSelection(value);
+                  if (Number(value) !== 747150001) {
+                    setEnvironmentZone('');
+                    setPowerPlatformEnvironmentId('');
+                  }
+                }}
                 disabled={saveIdeaSubmission.isPending}
               >
                 <SelectTrigger id="ai-platform-selection">
@@ -1399,7 +1417,11 @@ export default function SubmissionDetailPage() {
                 </Label>
                 <Select
                   value={environmentZone}
-                  onValueChange={(value) => { markEdited(); setEnvironmentZone(value); }}
+                  onValueChange={(value) => {
+                    markEdited();
+                    setEnvironmentZone(value);
+                    setPowerPlatformEnvironmentId('');
+                  }}
                   disabled={saveIdeaSubmission.isPending}
                 >
                   <SelectTrigger id="environment-zone" aria-required>
@@ -1411,6 +1433,35 @@ export default function SubmissionDetailPage() {
                         {opt.label}
                       </SelectItem>
                     ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {Number(platformSelection) === 747150001 && environmentZone && (
+              <div className="space-y-2 max-w-sm">
+                <Label htmlFor="power-platform-environment">Power Platform Environment</Label>
+                <Select
+                  value={powerPlatformEnvironmentId}
+                  onValueChange={(value) => { markEdited(); setPowerPlatformEnvironmentId(value); }}
+                  disabled={saveIdeaSubmission.isPending || powerPlatformEnvironments.isLoading}
+                >
+                  <SelectTrigger id="power-platform-environment">
+                    <SelectValue
+                      placeholder={
+                        powerPlatformEnvironments.isLoading
+                          ? 'Loading environments…'
+                          : 'Select an environment…'
+                      }
+                    />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {(powerPlatformEnvironments.data ?? [])
+                      .filter((env) => env.environmentZone === Number(environmentZone))
+                      .map((env) => (
+                        <SelectItem key={env.id} value={env.id}>
+                          {env.name}
+                        </SelectItem>
+                      ))}
                   </SelectContent>
                 </Select>
               </div>

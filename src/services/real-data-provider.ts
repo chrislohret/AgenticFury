@@ -26,6 +26,7 @@ import type {
   IdeaSubmission,
   LookupCategory,
   LookupOption,
+  PowerPlatformEnvironment,
   StageStatus,
 } from '@/types/domain-models';
 
@@ -48,6 +49,7 @@ const TABLES = {
   aiCoeRole: 'afp_aicoeroleses',
   teamMember: 'afp_aicoeteammembers',
   teamApproval: 'afp_aicoeteamapprovals',
+  powerPlatEnv: 'afp_powerplatenvironmentses',
   notes: 'annotations',
   systemUser: 'systemusers',
 } as const;
@@ -492,6 +494,10 @@ function mapIdeaSubmission(record: DataverseRecord, imageUrl?: string, pdfUrl?: 
     overallCostNotesHtml: normalizeText(safeRecord.afp_overallcostnoteshtml) || undefined,
     aiPlatformSelection: normalizeNumber(safeRecord.afp_aiplatformselection),
     environmentZone: normalizeNumber(safeRecord.afp_environmentzone) ?? null,
+    powerPlatformEnvironmentId: normalizeId(safeRecord._afp_powerplatformenvironment_value) || undefined,
+    powerPlatformEnvironmentName:
+      normalizeText(safeRecord['_afp_powerplatformenvironment_value@OData.Community.Display.V1.FormattedValue']) ||
+      undefined,
     status: mapIdeaStatus(safeRecord.statuscode),
     submissionStage: normalizeNumber(safeRecord.afp_ideasubmissionstage) ?? null,
     approvalStatus: normalizeNumber(safeRecord.afp_approvalstatus) ?? null,
@@ -525,6 +531,14 @@ function mapLookupOption(record: DataverseRecord): LookupOption {
     name: normalizeText(record.afp_name),
     description: normalizeText(record.afp_description) || undefined,
     isActive: normalizeBoolean(record.afp_isactive),
+  };
+}
+
+function mapPowerPlatformEnvironment(record: DataverseRecord): PowerPlatformEnvironment {
+  return {
+    id: getRecordGuid(record),
+    name: normalizeText(record.afp_newcolumn),
+    environmentZone: normalizeNumber(record.afp_environmentzone) ?? null,
   };
 }
 
@@ -704,6 +718,7 @@ async function listIdeaRecords(): Promise<DataverseRecord[]> {
       'afp_overallcostnoteshtml',
       'afp_aiplatformselection',
       'afp_environmentzone',
+      '_afp_powerplatformenvironment_value',
       'afp_ideasubmissionstage',
       'afp_approvalstatus',
       'afp_ideabuildstage',
@@ -744,6 +759,7 @@ async function getIdeaRecordById(id: string): Promise<DataverseRecord | null> {
       'afp_overallcostnoteshtml',
       'afp_aiplatformselection',
       'afp_environmentzone',
+      '_afp_powerplatformenvironment_value',
       'afp_ideasubmissionstage',
       'afp_approvalstatus',
       'afp_ideabuildstage',
@@ -896,7 +912,34 @@ export function createRealDataProvider(): AppDataProvider {
           body['afp_AssignedReviewer@odata.bind'] = `/${TABLES.systemUser}(${input.assignedReviewer})`;
         }
 
+        // Power Platform environment is a lookup to afp_powerplatenvironments.
+        // Bind when set; preserve the existing value when the caller doesn't
+        // touch it. Clearing is handled after the upsert (see below).
+        const nextEnvironmentId =
+          input.powerPlatformEnvironmentId !== undefined
+            ? input.powerPlatformEnvironmentId
+            : existing?.powerPlatformEnvironmentId ?? null;
+        if (nextEnvironmentId) {
+          body['afp_PowerPlatformEnvironment@odata.bind'] = `/${TABLES.powerPlatEnv}(${nextEnvironmentId})`;
+        }
+
         await upsertRow(TABLES.idea, id, body);
+
+        // A single-valued lookup can't be nulled through the PATCH body. When the
+        // caller explicitly cleared the environment, remove the reference.
+        if (input.powerPlatformEnvironmentId !== undefined && !input.powerPlatformEnvironmentId) {
+          try {
+            await MicrosoftDataverseService.DisassociateEntitiesWithOrganization(
+              ORG_URL,
+              TABLES.idea,
+              id,
+              'afp_PowerPlatformEnvironment',
+              '',
+            );
+          } catch {
+            // The reference may already be empty; ignore.
+          }
+        }
 
         if (input.estimatedCostsImageUrl !== undefined) {
           if (input.estimatedCostsImageUrl) {
@@ -1564,5 +1607,17 @@ export function createRealDataProvider(): AppDataProvider {
       },
     },
     fieldMetadata: { getField: getFieldMetadata },
+    powerPlatformEnvironments: {
+      async list(): Promise<PowerPlatformEnvironment[]> {
+        const rows = await listRows(
+          TABLES.powerPlatEnv,
+          selectFields(['afp_powerplatenvironmentsid', 'afp_newcolumn', 'afp_environmentzone']),
+        );
+        return rows
+          .map(mapPowerPlatformEnvironment)
+          .filter((env) => Boolean(env.name))
+          .sort((a, b) => a.name.localeCompare(b.name));
+      },
+    },
   } satisfies AppDataProvider;
 }
