@@ -3593,6 +3593,13 @@ export const dataSourcesInfo = {
     "dataSourceType": "Dataverse",
     "apis": {}
   },
+  "afp_powerplatenvironmentses": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "afp_powerplatenvironmentsid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
   "afp_scorecardweights": {
     "tableId": "",
     "version": "",

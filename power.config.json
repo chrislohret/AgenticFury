@@ -75,6 +75,10 @@
         "idearealizations": {
           "entitySetName": "afp_idearealizations",
           "logicalName": "afp_idearealization"
+        },
+        "powerplatenvironments": {
+          "entitySetName": "afp_powerplatenvironmentses",
+          "logicalName": "afp_powerplatenvironments"
         }
       },
       "environmentVariableName": ""
