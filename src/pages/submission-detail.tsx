@@ -67,6 +67,7 @@ import {
 import { approvalStatusLabel } from '@/constants/approvalStatus';
 import { getScoreBand } from '@/constants/scorecard';
 import { AI_PLATFORM_OPTIONS } from '@/constants/aiPlatform';
+import { ENVIRONMENT_ZONE_OPTIONS } from '@/constants/environmentZone';
 import type {
   CoeStructuredReview,
   CoeNote,
@@ -502,6 +503,7 @@ export default function SubmissionDetailPage() {
   const estimatedCostsFileInputRef = useRef<HTMLInputElement | null>(null);
   const [overallCostsForm, setOverallCostsForm] = useState<OverallCostsFormState>(EMPTY_OVERALL_COSTS_FORM);
   const [platformSelection, setPlatformSelection] = useState<string>('');
+  const [environmentZone, setEnvironmentZone] = useState<string>('');
   const [assignedReviewerId, setAssignedReviewerId] = useState<string>('');
   const [realizationForm, setRealizationForm] = useState({
     actualMonthlyCost: '',
@@ -601,6 +603,9 @@ export default function SubmissionDetailPage() {
     setPlatformSelection(
       submission?.aiPlatformSelection != null ? String(submission.aiPlatformSelection) : '',
     );
+    setEnvironmentZone(
+      submission?.environmentZone != null ? String(submission.environmentZone) : '',
+    );
   }, [
     submission?.monthlyCopilotCreditsCost,
     submission?.monthlyCopilotCreditsNotes,
@@ -609,6 +614,7 @@ export default function SubmissionDetailPage() {
     submission?.dataSourceCost,
     submission?.dataSourceNotes,
     submission?.aiPlatformSelection,
+    submission?.environmentZone,
   ]);
 
   const activeBusinessObjectiveOptions = useMemo(
@@ -828,6 +834,11 @@ export default function SubmissionDetailPage() {
   async function handleSaveAll(): Promise<boolean> {
     if (!submission || !relatedSubmissionId) return false;
 
+    if (Number(platformSelection) === 747150001 && !environmentZone) {
+      toast.error('Environment Zone is required.');
+      return false;
+    }
+
     const normalizedOverallCosts = normalizeOverallCostsForm(overallCostsForm);
 
     const structuredChanged =
@@ -873,6 +884,8 @@ export default function SubmissionDetailPage() {
         dataSourceCost: parseCost(normalizedOverallCosts.dataSourceCost),
         dataSourceNotes: normalizedOverallCosts.dataSourceNotes || undefined,
         aiPlatformSelection: platformSelection ? Number(platformSelection) : undefined,
+        environmentZone:
+          Number(platformSelection) === 747150001 && environmentZone ? Number(environmentZone) : null,
       });
 
       if (structuredChanged) {
@@ -1379,6 +1392,29 @@ export default function SubmissionDetailPage() {
                 </SelectContent>
               </Select>
             </div>
+            {Number(platformSelection) === 747150001 && (
+              <div className="space-y-2 max-w-sm">
+                <Label htmlFor="environment-zone">
+                  Environment Zone <span className="text-destructive">*</span>
+                </Label>
+                <Select
+                  value={environmentZone}
+                  onValueChange={(value) => { markEdited(); setEnvironmentZone(value); }}
+                  disabled={saveIdeaSubmission.isPending}
+                >
+                  <SelectTrigger id="environment-zone" aria-required>
+                    <SelectValue placeholder="Select an environment zone…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {ENVIRONMENT_ZONE_OPTIONS.map((opt) => (
+                      <SelectItem key={opt.value} value={String(opt.value)}>
+                        {opt.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
           </CardContent>
         </Card>
 

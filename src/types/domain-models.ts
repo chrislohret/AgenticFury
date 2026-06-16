@@ -34,6 +34,11 @@ export interface IdeaSubmission {
   dataSourceNotes?: string;
   overallCostNotesHtml?: string;
   aiPlatformSelection?: number;
+  /**
+   * Environment zone (afp_environmentzone choice). Only meaningful when the AI
+   * platform is Copilot Studio; cleared to null otherwise.
+   */
+  environmentZone?: number | null;
   status: number;
   /**
    * Submission stage (afp_ideasubmissionstage): Submitted, In Review, On Hold,
