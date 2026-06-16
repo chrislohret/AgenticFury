@@ -433,6 +433,7 @@ function getRecordGuid(record: DataverseRecord): string {
       record.afp_approvalhistoryentryid ??
       record.afp_aicoeteammemberid ??
       record.afp_aicoeteamapprovalid ??
+      record.afp_powerplatenvironmentsid ??
       record.annotationid ??
       record.systemuserid ??
       record.id,
@@ -1615,7 +1616,7 @@ export function createRealDataProvider(): AppDataProvider {
         );
         return rows
           .map(mapPowerPlatformEnvironment)
-          .filter((env) => Boolean(env.name))
+          .filter((env) => Boolean(env.id) && Boolean(env.name))
           .sort((a, b) => a.name.localeCompare(b.name));
       },
     },
