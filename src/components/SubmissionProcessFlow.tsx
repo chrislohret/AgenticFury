@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Check, Circle, Lock, PauseCircle, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
@@ -35,6 +36,8 @@ export interface SubmissionProcessFlowProps {
   statusChangeReason: string;
   onReasonChange: (value: string) => void;
   disabled?: boolean;
+  /** When true, the Approve action is blocked (e.g. scorecard incomplete). */
+  approveDisabled?: boolean;
 }
 
 const PHASE_ORDER: PhaseKey[] = ['submission', 'approval', 'build'];
@@ -81,6 +84,7 @@ export function SubmissionProcessFlow({
   statusChangeReason,
   onReasonChange,
   disabled,
+  approveDisabled,
 }: SubmissionProcessFlowProps) {
   // The "selected" values represent the user's pending intent and are kept in
   // sync with the committed record by the parent, so they are the source of
@@ -144,6 +148,25 @@ export function SubmissionProcessFlow({
     build: approved ? buildStageLabel(buildStage) : 'Locked',
   };
 
+  // A phase is navigable once its prerequisite is met. Submission is always
+  // navigable so the approver can return from approval and change the stage.
+  const phaseNavigable: Record<PhaseKey, boolean> = {
+    submission: true,
+    approval: approvalUnlocked,
+    build: approved,
+  };
+
+  // Let the user click a chevron to reveal that phase's controls. The override
+  // is cleared whenever the committed record changes (effect below), so the rail
+  // snaps back to following the active phase after a save.
+  const [viewPhaseOverride, setViewPhaseOverride] = useState<PhaseKey | null>(null);
+  const viewPhase: PhaseKey =
+    viewPhaseOverride && phaseNavigable[viewPhaseOverride] ? viewPhaseOverride : activePhase;
+
+  useEffect(() => {
+    setViewPhaseOverride(null);
+  }, [submissionStage, approvalStatus, buildStage]);
+
   const stageChangedFromCommitted =
     selectedStage != null && selectedStage !== (submissionStage ?? SUBMISSION_STAGE.DRAFT);
 
@@ -153,14 +176,19 @@ export function SubmissionProcessFlow({
       <div className="flex flex-col gap-2 p-3 sm:flex-row sm:items-stretch sm:gap-0">
         {PHASE_ORDER.map((phase, index) => {
           const state = phaseState[phase];
-          const isActive = phase === activePhase;
+          const isActive = phase === viewPhase;
+          const navigable = phaseNavigable[phase] && !disabled;
           return (
             <div key={phase} className="flex flex-1 items-center">
-              <div
+              <button
+                type="button"
+                disabled={!navigable}
+                onClick={() => setViewPhaseOverride(phase)}
                 className={cn(
-                  'flex flex-1 items-center gap-3 rounded-md border px-3 py-2 transition-colors',
+                  'flex flex-1 items-center gap-3 rounded-md border px-3 py-2 text-left transition-colors',
                   phaseStateClasses(state),
                   isActive && 'shadow-sm',
+                  navigable ? 'cursor-pointer hover:brightness-95' : 'cursor-not-allowed',
                 )}
                 aria-current={isActive ? 'step' : undefined}
               >
@@ -181,7 +209,7 @@ export function SubmissionProcessFlow({
                   </div>
                   <div className="truncate text-xs opacity-80">{phaseSummary[phase]}</div>
                 </div>
-              </div>
+              </button>
               {index < PHASE_ORDER.length - 1 && (
                 <div className="hidden px-1 text-muted-foreground sm:block" aria-hidden>
                   ›
@@ -194,7 +222,7 @@ export function SubmissionProcessFlow({
 
       {/* Active phase controls */}
       <div className="border-t bg-muted/20 p-4">
-        {activePhase === 'submission' && (
+        {viewPhase === 'submission' && (
           <div className="space-y-3">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">
               Move submission to
@@ -219,22 +247,6 @@ export function SubmissionProcessFlow({
                 );
               })}
             </div>
-            {stageChangedFromCommitted && (
-              <div className="space-y-1">
-                <Label htmlFor="process-status-reason" className="text-xs">
-                  Reason for status change<span className="text-destructive"> *</span>
-                </Label>
-                <Textarea
-                  id="process-status-reason"
-                  rows={2}
-                  value={statusChangeReason}
-                  onChange={(e) => onReasonChange(e.target.value)}
-                  placeholder="Explain why the status is changing. Captured in the activity notes."
-                  aria-required
-                  disabled={disabled}
-                />
-              </div>
-            )}
             <p className="text-xs text-muted-foreground">
               The submission moves through CoE intake here. Mark it{' '}
               <span className="font-medium">Review Completed</span> to unlock the approval decision.
@@ -242,7 +254,7 @@ export function SubmissionProcessFlow({
           </div>
         )}
 
-        {activePhase === 'approval' && (
+        {viewPhase === 'approval' && (
           <div className="space-y-3">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">
               Approval decision
@@ -261,7 +273,12 @@ export function SubmissionProcessFlow({
                 type="button"
                 size="sm"
                 variant={approved ? 'default' : 'secondary'}
-                disabled={disabled}
+                disabled={disabled || (approveDisabled && !approved)}
+                title={
+                  approveDisabled && !approved
+                    ? 'Complete the scorecard before approving.'
+                    : undefined
+                }
                 onClick={() => onApprovalChange(String(APPROVAL_STATUS.APPROVED))}
               >
                 <Check className="h-3.5 w-3.5" aria-hidden />
@@ -282,10 +299,15 @@ export function SubmissionProcessFlow({
             <p className="text-xs text-muted-foreground">
               Approving unlocks the build phase. Denying closes the idea.
             </p>
+            {approveDisabled && (
+              <p className="text-xs text-amber-700 dark:text-amber-300">
+                Approval is locked until the scorecard is complete.
+              </p>
+            )}
           </div>
         )}
 
-        {activePhase === 'build' && (
+        {viewPhase === 'build' && (
           <div className="space-y-3">
             <Label className="text-xs uppercase tracking-wide text-muted-foreground">
               Build phase
@@ -324,6 +346,26 @@ export function SubmissionProcessFlow({
             <p className="text-xs text-muted-foreground">
               Track delivery of the approved idea. Completing the build closes the flow.
             </p>
+          </div>
+        )}
+
+        {/* The status-change reason is required by the save, so it must stay
+            visible whenever the stage was changed — even when selecting a stage
+            (e.g. Review Completed) flips the active phase away from submission. */}
+        {stageChangedFromCommitted && (
+          <div className="mt-4 space-y-1 border-t pt-4">
+            <Label htmlFor="process-status-reason" className="text-xs">
+              Reason for status change<span className="text-destructive"> *</span>
+            </Label>
+            <Textarea
+              id="process-status-reason"
+              rows={2}
+              value={statusChangeReason}
+              onChange={(e) => onReasonChange(e.target.value)}
+              placeholder="Explain why the status is changing. Captured in the activity notes."
+              aria-required
+              disabled={disabled}
+            />
           </div>
         )}
       </div>

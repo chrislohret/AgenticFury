@@ -16,6 +16,10 @@ import type {
   AiCoeTeamMember,
   ScorecardWeight,
   IdeaRealization,
+  Platform,
+  PlatformAttribute,
+  PlatformAttributeCategory,
+  PlatformAttributeAssignment,
 } from '@/types/domain-models';
 import type { ScorecardDimensionKey } from '@/constants/scorecard';
 import { SUBMISSION_STAGE } from '@/constants/submissionStage';
@@ -42,6 +46,11 @@ export const queryKeys = {
   directoryUsers: ['directoryUsers'] as const,
   currentUserTeams: ['currentUser', 'teams'] as const,
   powerPlatformEnvironments: ['powerPlatformEnvironments'] as const,
+  platforms: ['platforms'] as const,
+  platformsWithAttributes: ['platforms', 'withAttributes'] as const,
+  platformAttributesByCategory: (category: PlatformAttributeCategory) =>
+    ['platformAttributes', category] as const,
+  platformAssignments: (platformId: string) => ['platformAssignments', platformId] as const,
 };
 
 export function useIdeaSubmissions() {
@@ -404,6 +413,98 @@ export function useDeleteAiCoeRole() {
       queryClient.setQueryData<AiCoeRole[]>(queryKeys.aiCoeRoles, (old) =>
         old ? old.filter((r) => r.id !== deletedId) : [],
       );
+    },
+  });
+}
+
+// ── Platform catalog ───────────────────────────────────────────────────────
+
+export function usePlatforms(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.platforms,
+    queryFn: () => provider.platforms.list(),
+    enabled,
+  });
+}
+
+export function usePlatformsWithAttributes(enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.platformsWithAttributes,
+    queryFn: () => provider.platforms.listWithAttributes(),
+    enabled,
+  });
+}
+
+function invalidatePlatformQueries(queryClient: ReturnType<typeof useQueryClient>) {
+  queryClient.invalidateQueries({ queryKey: queryKeys.platforms });
+  queryClient.invalidateQueries({ queryKey: queryKeys.platformsWithAttributes });
+}
+
+export function useSavePlatform() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Partial<Platform> & { name: string }) => provider.platforms.save(input),
+    onSuccess: () => invalidatePlatformQueries(queryClient),
+  });
+}
+
+export function useDeletePlatform() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => provider.platforms.delete(id),
+    onSuccess: () => invalidatePlatformQueries(queryClient),
+  });
+}
+
+export function usePlatformAttributes(category: PlatformAttributeCategory, enabled = true) {
+  return useQuery({
+    queryKey: queryKeys.platformAttributesByCategory(category),
+    queryFn: () => provider.platformAttributes.listByCategory(category),
+    enabled,
+  });
+}
+
+export function useSavePlatformAttribute() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: Partial<PlatformAttribute> & { name: string; category: PlatformAttributeCategory }) =>
+      provider.platformAttributes.save(input),
+    onSuccess: (attribute) => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.platformAttributesByCategory(attribute.category),
+      });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platformsWithAttributes });
+    },
+  });
+}
+
+export function useDeletePlatformAttribute(category: PlatformAttributeCategory) {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (id: string) => provider.platformAttributes.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.platformAttributesByCategory(category) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platformsWithAttributes });
+    },
+  });
+}
+
+export function usePlatformAssignments(platformId: string, enabled = true) {
+  return useQuery<PlatformAttributeAssignment[]>({
+    queryKey: queryKeys.platformAssignments(platformId || 'none'),
+    queryFn: () => provider.platformAttributeAssignments.listByPlatform(platformId),
+    enabled: enabled && Boolean(platformId),
+  });
+}
+
+export function useSetPlatformAssignments() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { platformId: string; attributeIds: string[] }) =>
+      provider.platformAttributeAssignments.setAssignments(input.platformId, input.attributeIds),
+    onSuccess: (_void, input) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.platformAssignments(input.platformId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.platformsWithAttributes });
     },
   });
 }

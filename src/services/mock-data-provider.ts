@@ -14,6 +14,9 @@ import type {
   ScorecardWeightRepository,
   IdeaRealizationRepository,
   PowerPlatformEnvironmentRepository,
+  PlatformRepository,
+  PlatformAttributeRepository,
+  PlatformAttributeAssignmentRepository,
 } from '@/services/data-contracts';
 import type {
   IdeaSubmission,
@@ -31,6 +34,11 @@ import type {
   AiCoeTeamApproval,
   ScorecardWeight,
   IdeaRealization,
+  Platform,
+  PlatformWithAttributes,
+  PlatformAttribute,
+  PlatformAttributeCategory,
+  PlatformAttributeAssignment,
 } from '@/types/domain-models';
 import type { PowerPlatformEnvironment } from '@/types/domain-models';
 import { AI_COE_FULL_TEAM_NAME } from '@/constants/security';
@@ -46,6 +54,9 @@ import { mockAiCoeTeamMembers } from '@/mockData/aiCoeTeamMember';
 import { mockAiCoeTeamApprovals } from '@/mockData/aiCoeTeamApproval';
 import { mockScorecardWeights } from '@/mockData/scorecardWeight';
 import { mockIdeaRealizations } from '@/mockData/ideaRealization';
+import { mockPlatforms } from '@/mockData/platform';
+import { mockPlatformAttributes } from '@/mockData/platformAttribute';
+import { mockPlatformAttributeAssignments } from '@/mockData/platformAttributeAssignment';
 import { computeWeightedTotal, weightsListToMap } from '@/lib/scorecard';
 
 function cloneRecord<T>(record: T): T {
@@ -434,6 +445,132 @@ function createAiCoeRoleRepository(roles: LookupOption[]): AiCoeRoleRepository {
   };
 }
 
+function createPlatformRepository(
+  platforms: Platform[],
+  attributes: PlatformAttribute[],
+  assignments: PlatformAttributeAssignment[],
+): PlatformRepository {
+  function attributesFor(
+    platformId: string,
+    category: PlatformAttributeCategory,
+  ): PlatformAttribute[] {
+    const assignedIds = new Set(
+      assignments.filter((a) => a.platformId === platformId).map((a) => a.attributeId),
+    );
+    return attributes
+      .filter((attr) => assignedIds.has(attr.id) && attr.category === category)
+      .sort((a, b) => a.name.localeCompare(b.name))
+      .map(cloneRecord);
+  }
+  return {
+    async list() {
+      return platforms
+        .slice()
+        .sort((a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name))
+        .map(cloneRecord);
+    },
+    async listWithAttributes(): Promise<PlatformWithAttributes[]> {
+      return platforms
+        .slice()
+        .sort((a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name))
+        .map((platform) => ({
+          ...cloneRecord(platform),
+          capabilities: attributesFor(platform.id, 'capability'),
+          decisionCriteria: attributesFor(platform.id, 'decision-criteria'),
+          costMechanisms: attributesFor(platform.id, 'cost-mechanism'),
+        }));
+    },
+    async save(input: Partial<Platform> & { name: string }) {
+      if (input.id) {
+        const index = platforms.findIndex((p) => p.id === input.id);
+        if (index >= 0) {
+          platforms[index] = {
+            ...platforms[index],
+            ...input,
+            name: input.name.trim() || platforms[index].name,
+          };
+          return cloneRecord(platforms[index]);
+        }
+      }
+      const record: Platform = {
+        id: crypto.randomUUID(),
+        name: input.name.trim(),
+        description: input.description?.trim() || undefined,
+        isActive: input.isActive ?? true,
+        displayOrder: input.displayOrder ?? 0,
+      };
+      platforms.push(record);
+      return cloneRecord(record);
+    },
+    async delete(id: string) {
+      const index = platforms.findIndex((p) => p.id === id);
+      if (index >= 0) platforms.splice(index, 1);
+      // Remove orphaned assignments for the deleted platform.
+      for (let i = assignments.length - 1; i >= 0; i -= 1) {
+        if (assignments[i].platformId === id) assignments.splice(i, 1);
+      }
+    },
+  };
+}
+
+function createPlatformAttributeRepository(
+  attributes: PlatformAttribute[],
+): PlatformAttributeRepository {
+  return {
+    async listByCategory(category: PlatformAttributeCategory) {
+      return attributes
+        .filter((a) => a.category === category)
+        .sort((a, b) => a.name.localeCompare(b.name))
+        .map(cloneRecord);
+    },
+    async save(input: Partial<PlatformAttribute> & { name: string; category: PlatformAttributeCategory }) {
+      if (input.id) {
+        const index = attributes.findIndex((a) => a.id === input.id);
+        if (index >= 0) {
+          attributes[index] = {
+            ...attributes[index],
+            ...input,
+            name: input.name.trim() || attributes[index].name,
+          };
+          return cloneRecord(attributes[index]);
+        }
+      }
+      const record: PlatformAttribute = {
+        id: crypto.randomUUID(),
+        name: input.name.trim(),
+        description: input.description?.trim() || undefined,
+        category: input.category,
+        isActive: input.isActive ?? true,
+      };
+      attributes.push(record);
+      return cloneRecord(record);
+    },
+    async delete(id: string) {
+      const index = attributes.findIndex((a) => a.id === id);
+      if (index >= 0) attributes.splice(index, 1);
+    },
+  };
+}
+
+function createPlatformAttributeAssignmentRepository(
+  assignments: PlatformAttributeAssignment[],
+): PlatformAttributeAssignmentRepository {
+  return {
+    async listByPlatform(platformId: string) {
+      return assignments.filter((a) => a.platformId === platformId).map(cloneRecord);
+    },
+    async setAssignments(platformId: string, attributeIds: string[]) {
+      // Replace the full set for this platform.
+      for (let i = assignments.length - 1; i >= 0; i -= 1) {
+        if (assignments[i].platformId === platformId) assignments.splice(i, 1);
+      }
+      for (const attributeId of new Set(attributeIds)) {
+        assignments.push({ id: crypto.randomUUID(), platformId, attributeId });
+      }
+    },
+  };
+}
+
 function createAiCoeTeamRepository(records: AiCoeTeamMember[]): AiCoeTeamRepository {
   return {
     async list() {
@@ -521,6 +658,9 @@ export function createMockDataProvider(): AppDataProvider {
   const approvalStore = mockAiCoeTeamApprovals.map(cloneRecord);
   const scorecardWeightStore = mockScorecardWeights.map(cloneRecord);
   const realizationStore = mockIdeaRealizations.map(cloneRecord);
+  const platformStore = mockPlatforms.map(cloneRecord);
+  const platformAttributeStore = mockPlatformAttributes.map(cloneRecord);
+  const platformAssignmentStore = mockPlatformAttributeAssignments.map(cloneRecord);
 
   return {
     ideaSubmissions: createIdeaSubmissionRepository(ideaStore),
@@ -535,6 +675,9 @@ export function createMockDataProvider(): AppDataProvider {
     aiCoeTeam: createAiCoeTeamRepository(teamStore),
     aiCoeTeamApprovals: createAiCoeTeamApprovalRepository(approvalStore),
     ideaRealizations: createIdeaRealizationRepository(realizationStore),
+    platforms: createPlatformRepository(platformStore, platformAttributeStore, platformAssignmentStore),
+    platformAttributes: createPlatformAttributeRepository(platformAttributeStore),
+    platformAttributeAssignments: createPlatformAttributeAssignmentRepository(platformAssignmentStore),
     directoryUsers: createDirectoryUserRepository(usersStore),    currentUser: {
       // Mock mode treats the local user as a member of the AI CoE Team Full
       // team so admin-only navigation is exercisable during prototype dev.

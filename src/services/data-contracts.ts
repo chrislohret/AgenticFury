@@ -14,6 +14,11 @@ import type {
   AiCoeTeamApproval,
   ScorecardWeight,
   IdeaRealization,
+  Platform,
+  PlatformWithAttributes,
+  PlatformAttribute,
+  PlatformAttributeCategory,
+  PlatformAttributeAssignment,
 } from '@/types/domain-models';
 import type { PowerPlatformEnvironment } from '@/types/domain-models';
 import type { ScorecardDimensionKey } from '@/constants/scorecard';
@@ -117,6 +122,38 @@ export interface AiCoeRoleRepository {
 }
 
 /**
+ * Configurable AI platform catalog (afp_platform). `listWithAttributes` resolves
+ * each platform's assigned attributes grouped by category for the submission picker.
+ */
+export interface PlatformRepository {
+  list(): Promise<Platform[]>;
+  listWithAttributes(): Promise<PlatformWithAttributes[]>;
+  save(input: Partial<Platform> & { name: string }): Promise<Platform>;
+  delete(id: string): Promise<void>;
+}
+
+/**
+ * Reusable platform attributes (afp_platformattribute) — capabilities, decision
+ * criteria, and cost mechanisms managed in the admin section.
+ */
+export interface PlatformAttributeRepository {
+  listByCategory(category: PlatformAttributeCategory): Promise<PlatformAttribute[]>;
+  save(
+    input: Partial<PlatformAttribute> & { name: string; category: PlatformAttributeCategory },
+  ): Promise<PlatformAttribute>;
+  delete(id: string): Promise<void>;
+}
+
+/**
+ * Platform↔attribute assignments (afp_platformattributeassignment join table).
+ * `setAssignments` replaces the full set of attributes assigned to a platform.
+ */
+export interface PlatformAttributeAssignmentRepository {
+  listByPlatform(platformId: string): Promise<PlatformAttributeAssignment[]>;
+  setAssignments(platformId: string, attributeIds: string[]): Promise<void>;
+}
+
+/**
  * Read-only reference list of provisioned Power Platform environments
  * (afp_powerplatenvironments). The UI filters the returned list by zone.
  */
@@ -169,6 +206,9 @@ export interface AppDataProvider {
   aiCoeTeam: AiCoeTeamRepository;
   aiCoeTeamApprovals: AiCoeTeamApprovalRepository;
   ideaRealizations: IdeaRealizationRepository;
+  platforms: PlatformRepository;
+  platformAttributes: PlatformAttributeRepository;
+  platformAttributeAssignments: PlatformAttributeAssignmentRepository;
   directoryUsers: DirectoryUserRepository;
   currentUser: CurrentUserRepository;
   fieldMetadata: FieldMetadataRepository;

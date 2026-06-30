@@ -33,7 +33,15 @@ export interface IdeaSubmission {
   dataSourceCost?: number;
   dataSourceNotes?: string;
   overallCostNotesHtml?: string;
+  /**
+   * @deprecated Replaced by the configurable platform catalog (`platformId`).
+   * Retained only for backward compatibility with historical records.
+   */
   aiPlatformSelection?: number;
+  /** GUID of the selected platform (afp_platformid lookup → afp_platform). */
+  platformId?: string | null;
+  /** Display name of the selected platform (expanded from the lookup). */
+  platformName?: string | null;
   /**
    * Environment zone (afp_environmentzone choice). Only meaningful when the AI
    * platform is Copilot Studio; cleared to null otherwise.
@@ -110,6 +118,57 @@ export interface AiCoeRole {
   id: string;
   name: string;
   description?: string;
+}
+
+/**
+ * The three kinds of reusable platform attributes a CoE admin can define and
+ * assign to platforms (afp_platformattribute.afp_category choice).
+ */
+export type PlatformAttributeCategory = 'capability' | 'decision-criteria' | 'cost-mechanism';
+
+/**
+ * A configurable AI platform option (afp_platform). Submitters pick one of
+ * these for an idea; CoE admins manage the list and assign attributes.
+ */
+export interface Platform {
+  id: string;
+  name: string;
+  description?: string;
+  isActive: boolean;
+  /** Sort order in the submission picker (afp_displayorder). */
+  displayOrder: number;
+}
+
+/**
+ * A reusable capability, decision criterion, or cost mechanism
+ * (afp_platformattribute) that can be assigned to one or more platforms.
+ */
+export interface PlatformAttribute {
+  id: string;
+  name: string;
+  description?: string;
+  category: PlatformAttributeCategory;
+  isActive: boolean;
+}
+
+/**
+ * A join record (afp_platformattributeassignment) linking a platform to a
+ * platform attribute (many-to-many).
+ */
+export interface PlatformAttributeAssignment {
+  id: string;
+  platformId: string;
+  attributeId: string;
+}
+
+/**
+ * A platform with its assigned attributes resolved and grouped by category.
+ * Used by the submission detail platform picker.
+ */
+export interface PlatformWithAttributes extends Platform {
+  capabilities: PlatformAttribute[];
+  decisionCriteria: PlatformAttribute[];
+  costMechanisms: PlatformAttribute[];
 }
 
 /**

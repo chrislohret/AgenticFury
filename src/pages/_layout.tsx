@@ -28,6 +28,7 @@ const navSections = [
       { to: "/coe-roles", label: "AI CoE Roles" },
       { to: "/scorecard-config", label: "Scorecard Configuration" },
       { to: "/lookup-tables", label: "Normalized Idea Configuration" },
+      { to: "/platform-catalog", label: "Platform Catalog" },
     ],
   },
 ]

@@ -27,6 +27,11 @@ import type {
   LookupCategory,
   LookupOption,
   PowerPlatformEnvironment,
+  Platform,
+  PlatformWithAttributes,
+  PlatformAttribute,
+  PlatformAttributeCategory,
+  PlatformAttributeAssignment,
   StageStatus,
 } from '@/types/domain-models';
 
@@ -50,6 +55,9 @@ const TABLES = {
   teamMember: 'afp_aicoeteammembers',
   teamApproval: 'afp_aicoeteamapprovals',
   powerPlatEnv: 'afp_powerplatenvironmentses',
+  platform: 'afp_platforms',
+  platformAttribute: 'afp_platformattributes',
+  platformAssignment: 'afp_platformattributeassignments',
   notes: 'annotations',
   systemUser: 'systemusers',
 } as const;
@@ -137,6 +145,20 @@ const LOOKUP_CATEGORY_BY_VALUE: Record<number, LookupCategory> = {
   100000004: 'risk-factors',
   100000005: 'departments',
   100000006: 'ai-coe-roles',
+};
+
+// Platform attribute category choice (afp_platformattribute.afp_category). Uses
+// the 747150xxx publisher range, matching the generated model.
+const PLATFORM_ATTRIBUTE_CATEGORY_VALUES: Record<PlatformAttributeCategory, number> = {
+  capability: 747150000,
+  'decision-criteria': 747150001,
+  'cost-mechanism': 747150002,
+};
+
+const PLATFORM_ATTRIBUTE_CATEGORY_BY_VALUE: Record<number, PlatformAttributeCategory> = {
+  747150000: 'capability',
+  747150001: 'decision-criteria',
+  747150002: 'cost-mechanism',
 };
 
 const DECISION_VALUES = {
@@ -434,6 +456,9 @@ function getRecordGuid(record: DataverseRecord): string {
       record.afp_aicoeteammemberid ??
       record.afp_aicoeteamapprovalid ??
       record.afp_powerplatenvironmentsid ??
+      record.afp_platformid ??
+      record.afp_platformattributeid ??
+      record.afp_platformattributeassignmentid ??
       record.annotationid ??
       record.systemuserid ??
       record.id,
@@ -494,6 +519,9 @@ function mapIdeaSubmission(record: DataverseRecord, imageUrl?: string, pdfUrl?: 
     dataSourceNotes: normalizeText(safeRecord.afp_datasourcenotes) || undefined,
     overallCostNotesHtml: normalizeText(safeRecord.afp_overallcostnoteshtml) || undefined,
     aiPlatformSelection: normalizeNumber(safeRecord.afp_aiplatformselection),
+    platformId: normalizeId(safeRecord._afp_platformid_value) || null,
+    platformName:
+      normalizeText(safeRecord['_afp_platformid_value@OData.Community.Display.V1.FormattedValue']) || null,
     environmentZone: normalizeNumber(safeRecord.afp_environmentzone) ?? null,
     powerPlatformEnvironmentId: normalizeId(safeRecord._afp_powerplatformenvironment_value) || undefined,
     powerPlatformEnvironmentName:
@@ -540,6 +568,31 @@ function mapPowerPlatformEnvironment(record: DataverseRecord): PowerPlatformEnvi
     id: getRecordGuid(record),
     name: normalizeText(record.afp_newcolumn),
     environmentZone: normalizeNumber(record.afp_environmentzone) ?? null,
+  };
+}
+
+function mapPlatform(record: DataverseRecord): Platform {
+  return {
+    id: getRecordGuid(record),
+    name: normalizeText(record.afp_name),
+    description: normalizeText(record.afp_description) || undefined,
+    isActive: normalizeBoolean(record.afp_isactive),
+    displayOrder: normalizeNumber(record.afp_displayorder) ?? 0,
+  };
+}
+
+function mapPlatformAttributeCategory(value: unknown): PlatformAttributeCategory {
+  const numeric = getNumber(value, PLATFORM_ATTRIBUTE_CATEGORY_VALUES.capability);
+  return PLATFORM_ATTRIBUTE_CATEGORY_BY_VALUE[numeric] ?? 'capability';
+}
+
+function mapPlatformAttribute(record: DataverseRecord): PlatformAttribute {
+  return {
+    id: getRecordGuid(record),
+    name: normalizeText(record.afp_name),
+    description: normalizeText(record.afp_description) || undefined,
+    category: mapPlatformAttributeCategory(record.afp_category),
+    isActive: normalizeBoolean(record.afp_isactive),
   };
 }
 
@@ -718,6 +771,7 @@ async function listIdeaRecords(): Promise<DataverseRecord[]> {
       'afp_datasourcenotes',
       'afp_overallcostnoteshtml',
       'afp_aiplatformselection',
+      '_afp_platformid_value',
       'afp_environmentzone',
       '_afp_powerplatformenvironment_value',
       'afp_ideasubmissionstage',
@@ -759,6 +813,7 @@ async function getIdeaRecordById(id: string): Promise<DataverseRecord | null> {
       'afp_datasourcenotes',
       'afp_overallcostnoteshtml',
       'afp_aiplatformselection',
+      '_afp_platformid_value',
       'afp_environmentzone',
       '_afp_powerplatformenvironment_value',
       'afp_ideasubmissionstage',
@@ -787,6 +842,33 @@ async function getLookupOptionRows(): Promise<LookupOption[]> {
     TABLES.lookupOption,
     selectFields(['afp_lookupoptionid', 'afp_name', 'afp_category', 'afp_description', 'afp_isactive']),
   )).map(mapLookupOption);
+}
+
+async function getPlatformRows(): Promise<Platform[]> {
+  return (await listRows(
+    TABLES.platform,
+    selectFields(['afp_platformid', 'afp_name', 'afp_description', 'afp_isactive', 'afp_displayorder']),
+  )).map(mapPlatform);
+}
+
+async function getPlatformAttributeRows(): Promise<PlatformAttribute[]> {
+  return (await listRows(
+    TABLES.platformAttribute,
+    selectFields(['afp_platformattributeid', 'afp_name', 'afp_description', 'afp_category', 'afp_isactive']),
+  )).map(mapPlatformAttribute);
+}
+
+async function getPlatformAssignmentRows(): Promise<PlatformAttributeAssignment[]> {
+  // Both afp_platformid and afp_attributeid are lookups, so they come back only
+  // as the _value form — selecting the bare logical name would 400 the query.
+  return (await listRows(
+    TABLES.platformAssignment,
+    selectFields(['afp_platformattributeassignmentid', '_afp_platformid_value', '_afp_attributeid_value']),
+  )).map((record) => ({
+    id: getRecordGuid(record),
+    platformId: normalizeId(record._afp_platformid_value),
+    attributeId: normalizeId(record._afp_attributeid_value),
+  }));
 }
 
 async function getStructuredReviewSelections(reviewId: string): Promise<LookupOption[]> {
@@ -924,6 +1006,15 @@ export function createRealDataProvider(): AppDataProvider {
           body['afp_PowerPlatformEnvironment@odata.bind'] = `/${TABLES.powerPlatEnv}(${nextEnvironmentId})`;
         }
 
+        // Platform is a lookup to afp_platforms (the configurable platform
+        // catalog). Bind when set; preserve the existing value when the caller
+        // doesn't touch it. Clearing is handled after the upsert (see below).
+        const nextPlatformId =
+          input.platformId !== undefined ? input.platformId : existing?.platformId ?? null;
+        if (nextPlatformId) {
+          body['afp_PlatformId@odata.bind'] = `/${TABLES.platform}(${nextPlatformId})`;
+        }
+
         await upsertRow(TABLES.idea, id, body);
 
         // A single-valued lookup can't be nulled through the PATCH body. When the
@@ -935,6 +1026,21 @@ export function createRealDataProvider(): AppDataProvider {
               TABLES.idea,
               id,
               'afp_PowerPlatformEnvironment',
+              '',
+            );
+          } catch {
+            // The reference may already be empty; ignore.
+          }
+        }
+
+        // Likewise, explicitly clearing the platform requires a disassociate.
+        if (input.platformId !== undefined && !input.platformId) {
+          try {
+            await MicrosoftDataverseService.DisassociateEntitiesWithOrganization(
+              ORG_URL,
+              TABLES.idea,
+              id,
+              'afp_PlatformId',
               '',
             );
           } catch {
@@ -1573,6 +1679,116 @@ export function createRealDataProvider(): AppDataProvider {
           actualGoLiveDate: input.actualGoLiveDate ?? existing?.actualGoLiveDate,
           outcomeRating: input.outcomeRating ?? existing?.outcomeRating,
         } satisfies IdeaRealization;
+      },
+    },
+    platforms: {
+      async list(): Promise<Platform[]> {
+        return (await getPlatformRows()).sort(
+          (a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name),
+        );
+      },
+      async listWithAttributes(): Promise<PlatformWithAttributes[]> {
+        const [platforms, attributes, assignments] = await Promise.all([
+          getPlatformRows(),
+          getPlatformAttributeRows(),
+          getPlatformAssignmentRows(),
+        ]);
+        const attributeMap = new Map(attributes.map((attr) => [attr.id, attr]));
+        return platforms
+          .sort((a, b) => a.displayOrder - b.displayOrder || a.name.localeCompare(b.name))
+          .map((platform) => {
+            const assigned = assignments
+              .filter((row) => row.platformId === platform.id)
+              .map((row) => attributeMap.get(row.attributeId))
+              .filter((attr): attr is PlatformAttribute => Boolean(attr));
+            const byCategory = (category: PlatformAttributeCategory) =>
+              assigned
+                .filter((attr) => attr.category === category)
+                .sort((a, b) => a.name.localeCompare(b.name));
+            return {
+              ...platform,
+              capabilities: byCategory('capability'),
+              decisionCriteria: byCategory('decision-criteria'),
+              costMechanisms: byCategory('cost-mechanism'),
+            };
+          });
+      },
+      async save(input: Partial<Platform> & { name: string }) {
+        const id = input.id ?? crypto.randomUUID();
+        const body: DataverseRecord = {
+          afp_name: input.name.trim(),
+          afp_description: input.description?.trim() ?? '',
+          afp_isactive: input.isActive ?? true,
+          afp_displayorder: input.displayOrder ?? 0,
+        };
+        const record = await upsertRow(TABLES.platform, id, body);
+        return mapPlatform({
+          ...record,
+          afp_platformid: id,
+          afp_name: body.afp_name,
+          afp_description: body.afp_description,
+          afp_isactive: body.afp_isactive,
+          afp_displayorder: body.afp_displayorder,
+        });
+      },
+      async delete(id: string) {
+        await MicrosoftDataverseService.DeleteRecordWithOrganization(ORG_URL, TABLES.platform, id);
+      },
+    },
+    platformAttributes: {
+      async listByCategory(category: PlatformAttributeCategory) {
+        return (await getPlatformAttributeRows())
+          .filter((attr) => attr.category === category)
+          .sort((a, b) => a.name.localeCompare(b.name));
+      },
+      async save(input: Partial<PlatformAttribute> & { name: string; category: PlatformAttributeCategory }) {
+        const id = input.id ?? crypto.randomUUID();
+        const body: DataverseRecord = {
+          afp_name: input.name.trim(),
+          afp_description: input.description?.trim() ?? '',
+          afp_category: PLATFORM_ATTRIBUTE_CATEGORY_VALUES[input.category],
+          afp_isactive: input.isActive ?? true,
+        };
+        const record = await upsertRow(TABLES.platformAttribute, id, body);
+        return mapPlatformAttribute({
+          ...record,
+          afp_platformattributeid: id,
+          afp_name: body.afp_name,
+          afp_description: body.afp_description,
+          afp_category: body.afp_category,
+          afp_isactive: body.afp_isactive,
+        });
+      },
+      async delete(id: string) {
+        await MicrosoftDataverseService.DeleteRecordWithOrganization(ORG_URL, TABLES.platformAttribute, id);
+      },
+    },
+    platformAttributeAssignments: {
+      async listByPlatform(platformId: string) {
+        return (await getPlatformAssignmentRows()).filter((row) => row.platformId === platformId);
+      },
+      async setAssignments(platformId: string, attributeIds: string[]) {
+        const existing = (await getPlatformAssignmentRows()).filter((row) => row.platformId === platformId);
+        await Promise.all(
+          existing.map((row) =>
+            MicrosoftDataverseService.DeleteRecordWithOrganization(
+              ORG_URL,
+              TABLES.platformAssignment,
+              row.id,
+            ),
+          ),
+        );
+        const uniqueIds = [...new Set(attributeIds)];
+        await Promise.all(
+          uniqueIds.map((attributeId) => {
+            const assignmentId = crypto.randomUUID();
+            return upsertRow(TABLES.platformAssignment, assignmentId, {
+              afp_name: `${platformId}:${attributeId}`,
+              'afp_PlatformId@odata.bind': `/${TABLES.platform}(${platformId})`,
+              'afp_AttributeId@odata.bind': `/${TABLES.platformAttribute}(${attributeId})`,
+            });
+          }),
+        );
       },
     },
     directoryUsers: {

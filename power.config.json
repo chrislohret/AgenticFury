@@ -79,6 +79,18 @@
         "powerplatenvironments": {
           "entitySetName": "afp_powerplatenvironmentses",
           "logicalName": "afp_powerplatenvironments"
+        },
+        "platforms": {
+          "entitySetName": "afp_platforms",
+          "logicalName": "afp_platform"
+        },
+        "platformattributes": {
+          "entitySetName": "afp_platformattributes",
+          "logicalName": "afp_platformattribute"
+        },
+        "platformattributeassignments": {
+          "entitySetName": "afp_platformattributeassignments",
+          "logicalName": "afp_platformattributeassignment"
         }
       },
       "environmentVariableName": ""

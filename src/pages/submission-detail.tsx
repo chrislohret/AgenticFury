@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, Link, useBlocker } from 'react-router-dom';
-import { ChevronDown, ChevronUp, Trash2, ChevronLeft, ChevronRight, ExternalLink, FileText, MessageSquare } from 'lucide-react';
+import { ChevronDown, ChevronUp, Trash2, ExternalLink, FileText, MessageSquare, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -21,14 +21,7 @@ import {
 } from '@/components/ui/dialog';
 import { CopilotAssistantPanel } from '@/components/copilot-assistant-panel';
 import { SubmissionProcessFlow } from '@/components/SubmissionProcessFlow';
-// Inlined as a base64 data URL via vite.config.ts `build.assetsInlineLimit`.
-// A separate hashed asset file would be fetched through the Power Apps storage
-// proxy at runtime, which is unreliable inside the host iframe (the image
-// silently fails to load). A data URL has no runtime fetch.
-import platformSelectorImg from '@/assets/platform_selector.png';
-import m365AgentBuilderImg from '@/assets/M365 Agent Builder.png';
-import copilotStudioImg from '@/assets/Microsoft Copilot Studio.png';
-import aiFoundryImg from '@/assets/Microsoft AI Foundry.png';
+import { useCurrentUser } from '@/hooks/useCurrentUser';
 import { toast } from 'sonner';
 import {
   Select,
@@ -47,7 +40,6 @@ import {
   useCoeNotes,
   useCreateCoeNote,
   useCoeApprovalHistory,
-  useCreateCoeApprovalHistory,
   useAiCoeTeam,
   useAiCoeRoles,
   useAiCoeTeamApprovals,
@@ -55,7 +47,7 @@ import {
   useDeleteAiCoeTeamApproval,
   useIdeaRealization,
   useSaveIdeaRealization,
-  usePowerPlatformEnvironments,
+  usePlatformsWithAttributes,
 } from '@/hooks/usePrototypeData';
 import {
   submissionStageLabel,
@@ -65,18 +57,23 @@ import {
   BUILD_STAGE,
   buildStageLabel,
 } from '@/constants/buildStage';
-import { approvalStatusLabel } from '@/constants/approvalStatus';
-import { getScoreBand } from '@/constants/scorecard';
-import { AI_PLATFORM_OPTIONS } from '@/constants/aiPlatform';
-import { ENVIRONMENT_ZONE_OPTIONS } from '@/constants/environmentZone';
+import { approvalStatusLabel, APPROVAL_STATUS } from '@/constants/approvalStatus';
+import {
+  getScoreBand,
+  SCORECARD_DIMENSIONS,
+  SCORECARD_MAX_SCORE,
+  type ScorecardDimensionKey,
+} from '@/constants/scorecard';
+import { isScorecardComplete } from '@/lib/scorecard';
 import type {
   CoeStructuredReview,
   CoeNote,
-  CoeApprovalHistoryEntry,
   AiCoeTeamApproval,
   AiCoeTeamMember,
   LookupOption,
   IdeaOutcomeRating,
+  PlatformAttribute,
+  IdeaScorecard,
 } from '@/types/domain-models';
 import { cn } from '@/lib/utils';
 import {
@@ -154,16 +151,6 @@ function toStructuredForm(review: CoeStructuredReview | null): StructuredFormSta
   };
 }
 
-// ── Platform selection carousel slides ─────────────────────────────────────
-
-const PLATFORM_SLIDES: { src: string; label: string }[] = [
-  { src: m365AgentBuilderImg, label: 'Microsoft 365 Agent Builder' },
-  { src: copilotStudioImg, label: 'Microsoft Copilot Studio' },
-  { src: aiFoundryImg, label: 'Microsoft AI Foundry' },
-];
-
-// ── AI platform selection (afp_aiplatformselection choice column) ───────────
-
 // ── CoE Activity Notes (Dataverse `annotation` table) ──────────────────────
 
 const AVATAR_COLORS = [
@@ -192,6 +179,110 @@ function formatNoteDate(iso: string) {
   );
 }
 
+type ScorecardScoresMap = Partial<Record<ScorecardDimensionKey, number>>;
+
+function ScorecardDimensionBars({ scores }: { scores: ScorecardScoresMap }) {
+  return (
+    <div className="space-y-2">
+      {SCORECARD_DIMENSIONS.map((dim) => {
+        const raw = scores[dim.key];
+        const has = typeof raw === 'number';
+        const pct = has ? (raw / SCORECARD_MAX_SCORE) * 100 : 0;
+        return (
+          <div key={dim.key} className="flex items-center gap-3">
+            <span className="w-44 shrink-0 truncate text-xs text-muted-foreground" title={dim.label}>
+              {dim.label}
+            </span>
+            <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+              <div
+                className={cn('h-full rounded-full', has ? 'bg-primary' : 'bg-transparent')}
+                style={{ width: `${pct}%` }}
+              />
+            </div>
+            <span className="w-10 shrink-0 text-right text-xs tabular-nums">
+              {has ? `${raw}/5` : '\u2014'}
+            </span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function ScorecardBanner({
+  submissionId,
+  scorecard,
+  complete,
+  scoredCount,
+}: {
+  submissionId: string;
+  scorecard: IdeaScorecard | null | undefined;
+  complete: boolean;
+  scoredCount: number;
+}) {
+  const band = getScoreBand(scorecard?.weightedTotal);
+  return (
+    <div
+      className={cn(
+        'mt-4 flex flex-wrap items-center gap-x-6 gap-y-3 rounded-lg border p-4',
+        complete ? 'bg-card' : 'border-amber-500/40 bg-amber-50 dark:bg-amber-950/20',
+      )}
+    >
+      <div className="flex flex-col">
+        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+          Evaluation Scorecard
+        </span>
+        <div className="flex items-baseline gap-2">
+          <span className="text-3xl font-semibold tabular-nums">
+            {typeof scorecard?.weightedTotal === 'number' ? scorecard.weightedTotal : '\u2014'}
+          </span>
+          <span className="text-sm text-muted-foreground">/ 100</span>
+          {band && (
+            <Badge variant={band.badgeVariant} title={band.description}>
+              {band.label}
+            </Badge>
+          )}
+        </div>
+      </div>
+      {complete ? (
+        <Badge variant="outline" className="gap-1 border-green-600/40 text-green-700">
+          <CheckCircle2 className="h-3 w-3" />
+          Complete
+        </Badge>
+      ) : (
+        <Badge variant="outline" className="gap-1 border-amber-600/40 text-amber-700">
+          <AlertTriangle className="h-3 w-3" />
+          {scoredCount} / 5 scored
+        </Badge>
+      )}
+      <Button variant={complete ? 'outline' : 'default'} size="sm" asChild className="ml-auto">
+        <Link to={`/submissions/${submissionId}/scorecard`}>
+          {complete ? 'Open scorecard' : 'Complete scorecard'}
+        </Link>
+      </Button>
+    </div>
+  );
+}
+
+function PlatformAttributeList({ title, items }: { title: string; items: PlatformAttribute[] }) {
+  return (
+    <div className="space-y-1">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
+      {items.length === 0 ? (
+        <p className="text-xs text-muted-foreground/70">&mdash;</p>
+      ) : (
+        <ul className="space-y-0.5">
+          {items.map((item) => (
+            <li key={item.id} className="text-sm leading-snug">
+              {item.name}
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  );
+}
+
 function NoteTimelineItem({ note }: { note: CoeNote }) {
   return (
     <div className="flex gap-3">
@@ -217,87 +308,50 @@ function NoteTimelineItem({ note }: { note: CoeNote }) {
   );
 }
 
-const APPROVAL_HISTORY_LABELS: Record<CoeApprovalHistoryEntry['decision'], string> = {
-  approved: 'Approved',
-  denied: 'Denied',
-};
-
-const APPROVAL_HISTORY_VARIANTS: Record<CoeApprovalHistoryEntry['decision'], 'default' | 'destructive'> = {
-  approved: 'default',
-  denied: 'destructive',
-};
-
-function formatApprovalDate(iso: string) {
-  return new Date(iso).toLocaleString();
-}
-
-const APPROVAL_STATUS_LABELS: Record<AiCoeTeamApproval['approvalStatus'], string> = {
-  pending: 'Pending',
-  approved: 'Approved',
-  denied: 'Denied',
-};
-
-const APPROVAL_STATUS_VARIANTS: Record<AiCoeTeamApproval['approvalStatus'], 'secondary' | 'default' | 'destructive'> = {
-  pending: 'secondary',
-  approved: 'default',
-  denied: 'destructive',
-};
 
 function ApprovalActionRow({
   member,
   roleName,
-  approval,
   comment,
   onCommentChange,
-  onApprove,
-  onDeny,
+  onCommentBlur,
   onDelete,
   isSaving,
 }: {
   member: AiCoeTeamMember;
   roleName: string;
-  approval: AiCoeTeamApproval | undefined;
   comment: string;
   onCommentChange: (value: string) => void;
-  onApprove: () => void;
-  onDeny: () => void;
+  onCommentBlur: () => void;
   onDelete: () => void;
   isSaving: boolean;
 }) {
-  const status = approval?.approvalStatus ?? 'pending';
-
   return (
     <TableRow>
       <TableCell className="align-top">
         <p className="font-medium">{member.userName}</p>
       </TableCell>
       <TableCell className="align-top">{roleName}</TableCell>
-      <TableCell className="align-top w-[42%] min-w-80">
+      <TableCell className="align-top w-[60%] min-w-80">
         <Textarea
           rows={2}
           value={comment}
           onChange={(event) => onCommentChange(event.target.value)}
-          placeholder="Add notes for this approval decision."
+          onBlur={onCommentBlur}
+          placeholder="Add notes for this contributor."
         />
       </TableCell>
-      <TableCell className="align-top">
-        <Badge variant={APPROVAL_STATUS_VARIANTS[status]}>{APPROVAL_STATUS_LABELS[status]}</Badge>
-      </TableCell>
-      <TableCell className="align-top">
-        <div className="flex flex-col gap-2">
-          <Button size="sm" onClick={onApprove} disabled={isSaving}>Approve</Button>
-          <Button size="sm" variant="destructive" onClick={onDeny} disabled={isSaving}>Deny</Button>
-          <Button
-            size="sm"
-            variant="ghost"
-            className="text-muted-foreground hover:text-destructive"
-            onClick={onDelete}
-            disabled={isSaving}
-            aria-label={`Remove ${member.userName} as approver`}
-          >
-            <Trash2 className="h-4 w-4" />
-          </Button>
-        </div>
+      <TableCell className="align-top w-12">
+        <Button
+          size="sm"
+          variant="ghost"
+          className="text-muted-foreground hover:text-destructive"
+          onClick={onDelete}
+          disabled={isSaving}
+          aria-label={`Remove ${member.userName} as contributor`}
+        >
+          <Trash2 className="h-4 w-4" />
+        </Button>
       </TableCell>
     </TableRow>
   );
@@ -443,8 +497,10 @@ function structuredFormKey(form: StructuredFormState) {
 const DETAIL_SECTIONS = [
   { id: 'section-copilot', label: 'Copilot Assistant' },
   { id: 'section-intake', label: 'Submitted Idea + Normalized Idea' },
-  { id: 'section-platform', label: 'Platform & Estimated Costs' },
-  { id: 'section-approvals', label: 'Approvals' },
+  { id: 'section-platform', label: 'Platform Selection' },
+  { id: 'section-scorecard', label: 'Scorecard' },
+  { id: 'section-approvals', label: 'Contributors' },
+  { id: 'section-costs', label: 'Estimated Costs' },
   { id: 'section-realization', label: 'Realized Outcomes' },
 ] as const;
 
@@ -466,16 +522,31 @@ export default function SubmissionDetailPage() {
   const saveIdeaSubmission = useSaveIdeaSubmission();
   const { data: structuredReview } = useCoeStructuredReview(relatedSubmissionId);
   const { data: scorecard } = useIdeaScorecard(relatedSubmissionId);
+  const scorecardScores = useMemo(
+    () => ({
+      businessValue: scorecard?.businessValueScore,
+      efficiency: scorecard?.efficiencyScore,
+      adoption: scorecard?.adoptionScore,
+      trustGovernance: scorecard?.trustGovernanceScore,
+      technicalPerformance: scorecard?.technicalPerformanceScore,
+    }),
+    [scorecard],
+  );
+  const scorecardComplete = useMemo(() => isScorecardComplete(scorecardScores), [scorecardScores]);
+  const scorecardScoredCount = useMemo(
+    () => Object.values(scorecardScores).filter((value) => typeof value === 'number').length,
+    [scorecardScores],
+  );
   const { data: notes = [] } = useCoeNotes(relatedSubmissionId);
   const { data: members = [], isLoading: membersLoading } = useAiCoeTeam(canLoadRelatedData);
+  const { data: currentUser } = useCurrentUser();
   const { data: approvals = [], isLoading: approvalsLoading } = useAiCoeTeamApprovals(relatedSubmissionId);
-  const { data: approvalHistory = [], isLoading: approvalHistoryLoading } = useCoeApprovalHistory(relatedSubmissionId);
+  const { data: approvalHistory = [] } = useCoeApprovalHistory(relatedSubmissionId);
   const { data: realization } = useIdeaRealization(relatedSubmissionId);
   const saveStructuredReview = useSaveCoeStructuredReview();
   const createNote = useCreateCoeNote();
   const saveApproval = useSaveAiCoeTeamApproval();
   const deleteApproval = useDeleteAiCoeTeamApproval(relatedSubmissionId);
-  const createApprovalHistory = useCreateCoeApprovalHistory();
   const saveRealization = useSaveIdeaRealization();
 
   const [addApproverMemberId, setAddApproverMemberId] = useState<string>('');
@@ -487,7 +558,7 @@ export default function SubmissionDetailPage() {
   const riskFactorOptions = useLookupOptions('risk-factors', canLoadRelatedData);
   const departmentOptions = useLookupOptions('departments', canLoadRelatedData);
   const aiCoeRoleOptions = useAiCoeRoles(canLoadRelatedData);
-  const powerPlatformEnvironments = usePowerPlatformEnvironments(canLoadRelatedData);
+  const platforms = usePlatformsWithAttributes(canLoadRelatedData);
 
   const [form, setForm] = useState<StructuredFormState>(EMPTY_STRUCTURED_FORM);
   const [newNoteText, setNewNoteText] = useState('');
@@ -497,16 +568,12 @@ export default function SubmissionDetailPage() {
   const [selectedApproval, setSelectedApproval] = useState<number | null>(null);
   const [statusChangeReason, setStatusChangeReason] = useState('');
   const [titleDraft, setTitleDraft] = useState('');
-  const [platformCarouselOpen, setPlatformCarouselOpen] = useState(false);
-  const [platformSlideIndex, setPlatformSlideIndex] = useState(0);
   const [costPdfPreview, setCostPdfPreview] = useState<string | null>(null);
   const [costPdfName, setCostPdfName] = useState<string | null>(null);
   const [pdfEdited, setPdfEdited] = useState(false);
   const estimatedCostsFileInputRef = useRef<HTMLInputElement | null>(null);
   const [overallCostsForm, setOverallCostsForm] = useState<OverallCostsFormState>(EMPTY_OVERALL_COSTS_FORM);
-  const [platformSelection, setPlatformSelection] = useState<string>('');
-  const [environmentZone, setEnvironmentZone] = useState<string>('');
-  const [powerPlatformEnvironmentId, setPowerPlatformEnvironmentId] = useState<string>('');
+  const [selectedPlatformId, setSelectedPlatformId] = useState<string>('');
   const [assignedReviewerId, setAssignedReviewerId] = useState<string>('');
   const [realizationForm, setRealizationForm] = useState({
     actualMonthlyCost: '',
@@ -519,7 +586,9 @@ export default function SubmissionDetailPage() {
     'section-copilot': false,
     'section-intake': true,
     'section-platform': false,
+    'section-scorecard': true,
     'section-approvals': false,
+    'section-costs': false,
     'section-realization': false,
   });
   const allSectionsOpen = DETAIL_SECTIONS.every((s) => openSections[s.id]);
@@ -603,15 +672,7 @@ export default function SubmissionDetailPage() {
       dataSourceCost: submission?.dataSourceCost?.toString() ?? '',
       dataSourceNotes: submission?.dataSourceNotes ?? '',
     });
-    setPlatformSelection(
-      submission?.aiPlatformSelection != null ? String(submission.aiPlatformSelection) : '',
-    );
-    setEnvironmentZone(
-      submission?.environmentZone != null ? String(submission.environmentZone) : '',
-    );
-    setPowerPlatformEnvironmentId(
-      submission?.powerPlatformEnvironmentId ? String(submission.powerPlatformEnvironmentId) : '',
-    );
+    setSelectedPlatformId(submission?.platformId ?? '');
   }, [
     submission?.monthlyCopilotCreditsCost,
     submission?.monthlyCopilotCreditsNotes,
@@ -619,9 +680,7 @@ export default function SubmissionDetailPage() {
     submission?.userBasedLicensingNotes,
     submission?.dataSourceCost,
     submission?.dataSourceNotes,
-    submission?.aiPlatformSelection,
-    submission?.environmentZone,
-    submission?.powerPlatformEnvironmentId,
+    submission?.platformId,
   ]);
 
   const activeBusinessObjectiveOptions = useMemo(
@@ -665,6 +724,19 @@ export default function SubmissionDetailPage() {
     const match = members.find((m) => m.memberId === assignedReviewerId);
     return match?.userName ?? submission?.assignedReviewerName ?? '';
   }, [assignedReviewerId, members, submission?.assignedReviewerName]);
+
+  // Only the user selected as the approver may change the submission/approval
+  // statuses. The runtime user context exposes an email (UPN) but not the
+  // systemuser GUID, so we bridge to the assigned reviewer's GUID via the CoE
+  // team roster: find the member whose `memberId` is the assigned reviewer and
+  // compare its email to the signed-in user's email (case-insensitive).
+  const isAssignedApprover = useMemo(() => {
+    if (!assignedReviewerId) return false;
+    const myEmail = currentUser?.email?.trim().toLowerCase();
+    if (!myEmail) return false;
+    const approverMember = members.find((m) => m.memberId === assignedReviewerId);
+    return approverMember?.userEmail?.trim().toLowerCase() === myEmail;
+  }, [assignedReviewerId, currentUser?.email, members]);
 
   const approvalMap = useMemo(
     () => new Map(approvals.map((approval) => [approval.teamMemberId, approval])),
@@ -799,20 +871,6 @@ export default function SubmissionDetailPage() {
     setSelectedApproval(value === 'pending' ? null : Number(value));
   }
 
-  async function handleAssignReviewer(memberSystemUserId: string) {
-    if (!submission) return;
-    const previous = assignedReviewerId;
-    setAssignedReviewerId(memberSystemUserId);
-    try {
-      await saveIdeaSubmission.mutateAsync({ id: submission.id, assignedReviewer: memberSystemUserId });
-      toast.success('Reviewer assigned.');
-    } catch (error) {
-      setAssignedReviewerId(previous);
-      const message = error instanceof Error ? error.message : 'Unknown error.';
-      toast.error(`Failed to assign reviewer: ${message}`);
-    }
-  }
-
   async function handleSaveRealization() {
     if (!relatedSubmissionId) return;
     const cost = realizationForm.actualMonthlyCost.trim();
@@ -841,11 +899,6 @@ export default function SubmissionDetailPage() {
   async function handleSaveAll(): Promise<boolean> {
     if (!submission || !relatedSubmissionId) return false;
 
-    if (Number(platformSelection) === 747150001 && !environmentZone) {
-      toast.error('Environment Zone is required.');
-      return false;
-    }
-
     const normalizedOverallCosts = normalizeOverallCostsForm(overallCostsForm);
 
     const structuredChanged =
@@ -866,6 +919,14 @@ export default function SubmissionDetailPage() {
     const nextApproval = selectedApproval;
     const currentApproval = submission.approvalStatus ?? null;
     const approvalChanged = nextApproval !== currentApproval;
+
+    // Gate: an idea cannot be marked Approved until the scorecard is complete
+    // (all five dimensions scored). This protects the approval decision from
+    // being recorded without a finished evaluation.
+    if (nextApproval === APPROVAL_STATUS.APPROVED && !scorecardComplete) {
+      toast.error('Complete the scorecard (all five dimensions) before approving this idea.');
+      return false;
+    }
 
     try {
       await saveIdeaSubmission.mutateAsync({
@@ -890,13 +951,7 @@ export default function SubmissionDetailPage() {
         userBasedLicensingNotes: normalizedOverallCosts.userBasedLicensingNotes || undefined,
         dataSourceCost: parseCost(normalizedOverallCosts.dataSourceCost),
         dataSourceNotes: normalizedOverallCosts.dataSourceNotes || undefined,
-        aiPlatformSelection: platformSelection ? Number(platformSelection) : undefined,
-        environmentZone:
-          Number(platformSelection) === 747150001 && environmentZone ? Number(environmentZone) : null,
-        powerPlatformEnvironmentId:
-          Number(platformSelection) === 747150001 && environmentZone && powerPlatformEnvironmentId
-            ? powerPlatformEnvironmentId
-            : null,
+        platformId: selectedPlatformId || null,
       });
 
       if (structuredChanged) {
@@ -1077,53 +1132,70 @@ export default function SubmissionDetailPage() {
       await saveApproval.mutateAsync({
         submissionId: relatedSubmissionId,
         teamMemberId: addApproverMemberId,
+        // Neutral placeholder — contributors carry no approval decision.
         approvalStatus: 'pending',
       });
       setAddApproverMemberId('');
-      toast.success('Approver added.');
+      toast.success('Contributor added.');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error.';
-      toast.error(`Failed to add approver: ${message}`);
+      toast.error(`Failed to add contributor: ${message}`);
+    }
+  }
+
+  // Designate one contributor as the approver responsible for changing the
+  // submission status and approval decision. The selection is persisted to the
+  // submission's assignedReviewer lookup (systemuser GUID). Until an approver is
+  // set, the status/approval controls in the header stay disabled.
+  async function handleSelectApprover(memberId: string) {
+    if (!submission || !memberId) return;
+    const previous = assignedReviewerId;
+    setAssignedReviewerId(memberId);
+    try {
+      await saveIdeaSubmission.mutateAsync({
+        id: submission.id,
+        assignedReviewer: memberId,
+      });
+      toast.success('Approver updated.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error.';
+      setAssignedReviewerId(previous);
+      toast.error(`Failed to update approver: ${message}`);
     }
   }
 
   async function handleDeleteApprover(approval: AiCoeTeamApproval, memberName: string) {
     try {
       await deleteApproval.mutateAsync(approval.id);
-      toast.success(`${memberName} removed as approver.`);
+      toast.success(`${memberName} removed as contributor.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error.';
-      toast.error(`Failed to remove approver: ${message}`);
+      toast.error(`Failed to remove contributor: ${message}`);
     }
   }
 
-  async function handleApprovalDecision(member: AiCoeTeamMember, decision: 'approved' | 'denied') {
+  async function handleSaveComment(member: AiCoeTeamMember) {
     if (!relatedSubmissionId) return;
 
     const comment = approvalComments[member.id]?.trim() ?? '';
+    const existing = approvalMap.get(member.id);
 
-    const roleName = roleMap.get(member.roleId) ?? 'Unknown role';
+    // Skip redundant saves when the comment hasn't changed.
+    if ((existing?.comment ?? '') === comment) return;
 
     try {
       await saveApproval.mutateAsync({
         submissionId: relatedSubmissionId,
         teamMemberId: member.id,
-        approvalStatus: decision,
+        // Contributors carry no approval decision. 'pending' is a neutral
+        // placeholder until approvals are reworked solution-wide.
+        approvalStatus: 'pending',
         comment: comment || undefined,
       });
-
-      await createApprovalHistory.mutateAsync({
-        submissionId: relatedSubmissionId,
-        userName: member.userName,
-        roleName,
-        decision,
-        comments: comment || undefined,
-      });
-
-      toast.success(`${member.userName} marked as ${decision}.`);
+      toast.success(`Comment saved for ${member.userName}.`);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown error.';
-      toast.error(`Failed to save approval decision: ${message}`);
+      toast.error(`Failed to save comment: ${message}`);
     }
   }
 
@@ -1172,35 +1244,18 @@ export default function SubmissionDetailPage() {
               {submission.phiRequired && <Badge variant="destructive">PHI</Badge>}
             </div>
           </div>
-          <div className="flex items-start gap-2 shrink-0 rounded-lg border bg-card p-3">
-            <div className="space-y-1.5">
-              <Label>Scorecard</Label>
-              <Button variant="outline" size="sm" asChild>
-                <Link to={`/submissions/${submission.id}/scorecard`}>
-                  Scorecard
-                  {typeof scorecard?.weightedTotal === 'number' && (
-                    <Badge variant="secondary" className="ml-2">
-                      {scorecard.weightedTotal} / 100
-                    </Badge>
-                  )}
-                </Link>
-              </Button>
-              {(() => {
-                const band = getScoreBand(scorecard?.weightedTotal);
-                return band ? (
-                  <Badge variant={band.badgeVariant} title={band.description}>
-                    {band.label}
-                  </Badge>
-                ) : null;
-              })()}
-            </div>
-          </div>
         </div>
         <p className="text-xs text-muted-foreground mt-1">
           {submission.department && `${submission.department} · `}
           Submitted {submission.createdOn ?? 'unknown'}
-          {assignedReviewerLabel && ` · Reviewer: ${assignedReviewerLabel}`}
+          {assignedReviewerLabel && ` · Approver: ${assignedReviewerLabel}`}
         </p>
+        <ScorecardBanner
+          submissionId={submission.id}
+          scorecard={scorecard}
+          complete={scorecardComplete}
+          scoredCount={scorecardScoredCount}
+        />
         <div className="mt-4">
           <SubmissionProcessFlow
             submissionStage={submission.submissionStage ?? null}
@@ -1214,8 +1269,31 @@ export default function SubmissionDetailPage() {
             onBuildChange={handleBuildStageChange}
             statusChangeReason={statusChangeReason}
             onReasonChange={setStatusChangeReason}
-            disabled={saveIdeaSubmission.isPending}
+            disabled={saveIdeaSubmission.isPending || !assignedReviewerId || !isAssignedApprover}
+            approveDisabled={!scorecardComplete}
           />
+          {!assignedReviewerId ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Select an approver in the Contributors section to enable the status and approval controls.
+            </p>
+          ) : !isAssignedApprover ? (
+            <p className="mt-2 text-xs text-muted-foreground">
+              Only the assigned approver{assignedReviewerLabel ? ` (${assignedReviewerLabel})` : ''} can
+              change the submission and approval statuses.
+            </p>
+          ) : null}
+          {!scorecardComplete && (
+            <div className="mt-3 flex flex-wrap items-center gap-2 rounded-md border border-amber-500/40 bg-amber-50 px-3 py-2 text-sm text-amber-800 dark:bg-amber-950/30 dark:text-amber-200">
+              <AlertTriangle className="h-4 w-4 shrink-0" />
+              <span>
+                The scorecard must be completed (all five dimensions scored) before this idea can be
+                approved.
+              </span>
+              <Button variant="outline" size="sm" asChild className="ml-auto h-7">
+                <Link to={`/submissions/${submission.id}/scorecard`}>Complete scorecard</Link>
+              </Button>
+            </div>
+          )}
         </div>
       </div>
 
@@ -1359,119 +1437,271 @@ export default function SubmissionDetailPage() {
 
       <CollapsibleSection
         id="section-platform"
-        title="Section 2: Platform Selection and Estimated Costs"
-        subtitle="Capture overall costs, agent credit image evidence, and supporting notes."
+        title="Section 2: Platform Selection"
+        subtitle="Choose the target AI platform for this idea."
         open={openSections['section-platform']}
         onToggle={toggleSection}
       >
         <Card>
           <CardHeader>
-            <CardTitle className="text-base">Section A: Platform Selection</CardTitle>
+            <CardTitle className="text-base">Platform Selection</CardTitle>
             <p className="text-xs text-muted-foreground">
-              Choose the target AI platform for this idea.
+              Review each platform&rsquo;s capabilities, decision criteria, and cost mechanisms, then
+              select the best fit for this idea.
             </p>
-            <button
-              type="button"
-              onClick={() => { setPlatformSlideIndex(0); setPlatformCarouselOpen(true); }}
-              className="mt-3 block rounded-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              aria-label="Open platform options carousel"
-            >
-              <img
-                src={platformSelectorImg}
-                alt="Platform selector — click to view platform options"
-                className="w-full max-w-2xl rounded-md border bg-background cursor-pointer transition-opacity hover:opacity-90"
-              />
-            </button>
           </CardHeader>
-          <CardContent className="space-y-3">
-            <div className="space-y-2 max-w-sm">
-              <Label htmlFor="ai-platform-selection">AI Platform</Label>
-              <Select
-                value={platformSelection}
-                onValueChange={(value) => {
-                  markEdited();
-                  setPlatformSelection(value);
-                  if (Number(value) !== 747150001) {
-                    setEnvironmentZone('');
-                    setPowerPlatformEnvironmentId('');
-                  }
-                }}
-                disabled={saveIdeaSubmission.isPending}
-              >
-                <SelectTrigger id="ai-platform-selection">
-                  <SelectValue placeholder="Select a platform…" />
-                </SelectTrigger>
-                <SelectContent>
-                  {AI_PLATFORM_OPTIONS.map((opt) => (
-                    <SelectItem key={opt.value} value={String(opt.value)}>
-                      {opt.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            {Number(platformSelection) === 747150001 && (
-              <div className="space-y-2 max-w-sm">
-                <Label htmlFor="environment-zone">
-                  Environment Zone <span className="text-destructive">*</span>
-                </Label>
-                <Select
-                  value={environmentZone}
-                  onValueChange={(value) => {
-                    markEdited();
-                    setEnvironmentZone(value);
-                    setPowerPlatformEnvironmentId('');
-                  }}
-                  disabled={saveIdeaSubmission.isPending}
-                >
-                  <SelectTrigger id="environment-zone" aria-required>
-                    <SelectValue placeholder="Select an environment zone…" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {ENVIRONMENT_ZONE_OPTIONS.map((opt) => (
-                      <SelectItem key={opt.value} value={String(opt.value)}>
-                        {opt.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            )}
-            {Number(platformSelection) === 747150001 && environmentZone && (
-              <div className="space-y-2 max-w-sm">
-                <Label htmlFor="power-platform-environment">Power Platform Environment</Label>
-                <Select
-                  value={powerPlatformEnvironmentId}
-                  onValueChange={(value) => { markEdited(); setPowerPlatformEnvironmentId(value); }}
-                  disabled={saveIdeaSubmission.isPending || powerPlatformEnvironments.isLoading}
-                >
-                  <SelectTrigger id="power-platform-environment">
-                    <SelectValue
-                      placeholder={
-                        powerPlatformEnvironments.isLoading
-                          ? 'Loading environments…'
-                          : 'Select an environment…'
-                      }
-                    />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {(powerPlatformEnvironments.data ?? [])
-                      .filter((env) => env.environmentZone === Number(environmentZone))
-                      .map((env) => (
-                        <SelectItem key={env.id} value={env.id}>
-                          {env.name}
-                        </SelectItem>
-                      ))}
-                  </SelectContent>
-                </Select>
+          <CardContent>
+            {platforms.isLoading ? (
+              <p className="text-sm text-muted-foreground">Loading platforms…</p>
+            ) : (platforms.data ?? []).filter((p) => p.isActive).length === 0 ? (
+              <p className="text-sm text-muted-foreground">
+                No platforms are configured yet. A CoE administrator can add them in the Platform
+                Catalog.
+              </p>
+            ) : (
+              <div className="max-h-[28rem] overflow-y-auto pr-1 space-y-3">
+                {(platforms.data ?? [])
+                  .filter((platform) => platform.isActive || platform.id === selectedPlatformId)
+                  .map((platform) => {
+                    const isSelected = selectedPlatformId === platform.id;
+                    return (
+                      <button
+                        key={platform.id}
+                        type="button"
+                        onClick={() => {
+                          markEdited();
+                          setSelectedPlatformId(platform.id);
+                        }}
+                        disabled={saveIdeaSubmission.isPending}
+                        aria-pressed={isSelected}
+                        className={cn(
+                          'w-full text-left rounded-lg border p-4 transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                          isSelected
+                            ? 'border-primary ring-1 ring-primary bg-primary/5'
+                            : 'hover:bg-muted/50',
+                        )}
+                      >
+                        <div className="flex items-start gap-3">
+                          <span
+                            className={cn(
+                              'mt-0.5 h-4 w-4 shrink-0 rounded-full border-2',
+                              isSelected ? 'border-primary bg-primary' : 'border-muted-foreground',
+                            )}
+                            aria-hidden
+                          />
+                          <div className="flex-1 min-w-0 space-y-3">
+                            <div>
+                              <div className="font-medium">{platform.name}</div>
+                              {platform.description && (
+                                <p className="text-sm text-muted-foreground mt-0.5">
+                                  {platform.description}
+                                </p>
+                              )}
+                            </div>
+                            <div className="grid gap-3 sm:grid-cols-3">
+                              <PlatformAttributeList title="Capabilities" items={platform.capabilities} />
+                              <PlatformAttributeList
+                                title="Decision Criteria"
+                                items={platform.decisionCriteria}
+                              />
+                              <PlatformAttributeList
+                                title="Cost Mechanisms"
+                                items={platform.costMechanisms}
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
               </div>
             )}
           </CardContent>
         </Card>
+      </CollapsibleSection>
 
+      <CollapsibleSection
+        id="section-scorecard"
+        title="Scorecard"
+        subtitle="Weighted evaluation across the five scoring dimensions."
+        open={openSections['section-scorecard']}
+        onToggle={toggleSection}
+      >
+        <Card>
+          <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
+            <div className="space-y-1">
+              <CardTitle className="text-base">Evaluation Scorecard</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                {scorecardComplete
+                  ? 'All five dimensions scored.'
+                  : `${scorecardScoredCount} of 5 dimensions scored — complete the scorecard before approval.`}
+              </p>
+            </div>
+            <Button variant={scorecardComplete ? 'outline' : 'default'} size="sm" asChild>
+              <Link to={`/submissions/${submission.id}/scorecard`}>
+                {scorecardComplete ? 'Open scorecard' : 'Complete scorecard'}
+              </Link>
+            </Button>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex items-center gap-3">
+              <span className="text-2xl font-semibold tabular-nums">
+                {typeof scorecard?.weightedTotal === 'number' ? scorecard.weightedTotal : '\u2014'}
+              </span>
+              <span className="text-sm text-muted-foreground">/ 100</span>
+              {(() => {
+                const band = getScoreBand(scorecard?.weightedTotal);
+                return band ? (
+                  <Badge variant={band.badgeVariant} title={band.description}>
+                    {band.label}
+                  </Badge>
+                ) : null;
+              })()}
+              {scorecardComplete ? (
+                <Badge variant="outline" className="gap-1 border-green-600/40 text-green-700">
+                  <CheckCircle2 className="h-3 w-3" />
+                  Complete
+                </Badge>
+              ) : (
+                <Badge variant="outline" className="gap-1 border-amber-600/40 text-amber-700">
+                  <AlertTriangle className="h-3 w-3" />
+                  Incomplete
+                </Badge>
+              )}
+            </div>
+            <ScorecardDimensionBars scores={scorecardScores} />
+          </CardContent>
+        </Card>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        id="section-approvals"
+        title="Section 3: Contributors"
+        subtitle="Contributors and their comments for this idea."
+        open={openSections['section-approvals']}
+        onToggle={toggleSection}
+      >
+        <Card>
+          <CardHeader>
+            <CardTitle className="text-base">Contributors</CardTitle>
+            <p className="text-xs text-muted-foreground">
+              Add CoE team members as contributors and capture their comments for this idea.
+            </p>
+          </CardHeader>
+          <CardContent>
+            {membersLoading || approvalsLoading ? (
+              <p className="text-sm text-muted-foreground">Loading contributors…</p>
+            ) : (
+              <div className="space-y-4">
+                {/* Add Contributor row */}
+                {members.length > 0 && (
+                  <div className="flex items-center gap-2">
+                    <Select value={addApproverMemberId} onValueChange={setAddApproverMemberId}>
+                      <SelectTrigger className="w-72">
+                        <SelectValue placeholder="Select a team member to add…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {addableMembers.length === 0 ? (
+                          <SelectItem value="__none" disabled>All team members added</SelectItem>
+                        ) : (
+                          addableMembers.map((m) => (
+                            <SelectItem key={m.id} value={m.id}>
+                              {m.userName} — {roleMap.get(m.roleId) ?? 'Unknown role'}
+                            </SelectItem>
+                          ))
+                        )}
+                      </SelectContent>
+                    </Select>
+                    <Button
+                      size="sm"
+                      onClick={() => void handleAddApprover()}
+                      disabled={!addApproverMemberId || saveApproval.isPending}
+                    >
+                      Add Contributor
+                    </Button>
+                  </div>
+                )}
+
+                {/* Designated approver */}
+                {approverMembers.length > 0 && (
+                  <div className="space-y-2 rounded-md border bg-muted/20 p-3">
+                    <Label className="text-sm font-medium">Approver</Label>
+                    <p className="text-xs text-muted-foreground">
+                      Select the contributor responsible for changing the submission status and
+                      approval decision. Those controls stay disabled until an approver is selected.
+                    </p>
+                    <Select
+                      value={assignedReviewerId || undefined}
+                      onValueChange={(value) => void handleSelectApprover(value)}
+                    >
+                      <SelectTrigger className="w-72">
+                        <SelectValue placeholder="Select an approver…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {approverMembers.map((m) => (
+                          <SelectItem key={m.id} value={m.memberId}>
+                            {m.userName} — {roleMap.get(m.roleId) ?? 'Unknown role'}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
+
+                {/* Contributors table */}
+                {approverMembers.length === 0 ? (
+                  <p className="text-sm text-muted-foreground">
+                    No contributors added yet. Use the picker above to add CoE team members.
+                  </p>
+                ) : (
+                  <div className="overflow-x-auto rounded-md border">
+                    <Table>
+                      <TableHeader>
+                        <TableRow>
+                          <TableHead>User</TableHead>
+                          <TableHead>Role</TableHead>
+                          <TableHead>Comments</TableHead>
+                          <TableHead className="w-12" />
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {approverMembers.map((member) => (
+                          <ApprovalActionRow
+                            key={member.id}
+                            member={member}
+                            roleName={roleMap.get(member.roleId) ?? 'Unknown role'}
+                            comment={approvalComments[member.id] ?? ''}
+                            onCommentChange={(value) =>
+                              setApprovalComments((current) => ({ ...current, [member.id]: value }))
+                            }
+                            onCommentBlur={() => void handleSaveComment(member)}
+                            onDelete={() => {
+                              const approval = approvalMap.get(member.id);
+                              if (approval) void handleDeleteApprover(approval, member.userName);
+                            }}
+                            isSaving={saveApproval.isPending || deleteApproval.isPending}
+                          />
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </CollapsibleSection>
+
+      <CollapsibleSection
+        id="section-costs"
+        title="Section 4: Estimated Costs"
+        subtitle="Capture agent credit costs and overall cost estimates with supporting notes."
+        open={openSections['section-costs']}
+        onToggle={toggleSection}
+      >
         <Card className="bg-muted/30">
           <CardHeader>
-            <CardTitle className="text-base">Section B: Agent Credit Costs</CardTitle>
+            <CardTitle className="text-base">Agent Credit Costs</CardTitle>
             <p className="text-xs text-muted-foreground">
               Upload the PDF exported from the Copilot Studio Estimator
             </p>
@@ -1546,7 +1776,7 @@ export default function SubmissionDetailPage() {
 
         <Card className="bg-muted/30">
           <CardHeader>
-            <CardTitle className="text-base">Section C: Overall Costs</CardTitle>
+            <CardTitle className="text-base">Overall Costs</CardTitle>
             <p className="text-xs text-muted-foreground">
               Capture high-level costs and rationale notes.
             </p>
@@ -1653,176 +1883,8 @@ export default function SubmissionDetailPage() {
       </CollapsibleSection>
 
       <CollapsibleSection
-        id="section-approvals"
-        title="Section 3: Approvals"
-        subtitle="Current approvals and read-only approval history for this idea."
-        open={openSections['section-approvals']}
-        onToggle={toggleSection}
-      >
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Approvals</CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Decide approval or denial per CoE team member for this idea.
-            </p>
-          </CardHeader>
-          <CardContent>
-            {membersLoading || approvalsLoading ? (
-              <p className="text-sm text-muted-foreground">Loading approvals…</p>
-            ) : (
-              <div className="space-y-4">
-                {/* Assigned reviewer */}
-                <div className="flex flex-wrap items-center gap-2">
-                  <Label className="text-sm">Assigned reviewer</Label>
-                  <Select
-                    value={assignedReviewerId || '__none'}
-                    onValueChange={(value) => void handleAssignReviewer(value === '__none' ? '' : value)}
-                    disabled={saveIdeaSubmission.isPending || members.length === 0}
-                  >
-                    <SelectTrigger className="w-72">
-                      <SelectValue placeholder="Unassigned" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="__none">Unassigned</SelectItem>
-                      {members.map((m) => (
-                        <SelectItem key={m.id} value={m.memberId}>
-                          {m.userName} — {roleMap.get(m.roleId) ?? 'Unknown role'}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-
-                {/* Add Approver row */}
-                {members.length > 0 && (
-                  <div className="flex items-center gap-2">
-                    <Select value={addApproverMemberId} onValueChange={setAddApproverMemberId}>
-                      <SelectTrigger className="w-72">
-                        <SelectValue placeholder="Select a team member to add…" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {addableMembers.length === 0 ? (
-                          <SelectItem value="__none" disabled>All team members added</SelectItem>
-                        ) : (
-                          addableMembers.map((m) => (
-                            <SelectItem key={m.id} value={m.id}>
-                              {m.userName} — {roleMap.get(m.roleId) ?? 'Unknown role'}
-                            </SelectItem>
-                          ))
-                        )}
-                      </SelectContent>
-                    </Select>
-                    <Button
-                      size="sm"
-                      onClick={() => void handleAddApprover()}
-                      disabled={!addApproverMemberId || saveApproval.isPending}
-                    >
-                      Add Approver
-                    </Button>
-                  </div>
-                )}
-
-                {/* Approvers table */}
-                {approverMembers.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">
-                    No approvers assigned yet. Use the picker above to add CoE team members.
-                  </p>
-                ) : (
-                  <div className="overflow-x-auto rounded-md border">
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>User</TableHead>
-                          <TableHead>Role</TableHead>
-                          <TableHead>Comments</TableHead>
-                          <TableHead>Status</TableHead>
-                          <TableHead className="w-36">Action</TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {approverMembers.map((member) => (
-                          <ApprovalActionRow
-                            key={member.id}
-                            member={member}
-                            roleName={roleMap.get(member.roleId) ?? 'Unknown role'}
-                            approval={approvalMap.get(member.id)}
-                            comment={approvalComments[member.id] ?? ''}
-                            onCommentChange={(value) =>
-                              setApprovalComments((current) => ({ ...current, [member.id]: value }))
-                            }
-                            onApprove={() => void handleApprovalDecision(member, 'approved')}
-                            onDeny={() => void handleApprovalDecision(member, 'denied')}
-                            onDelete={() => {
-                              const approval = approvalMap.get(member.id);
-                              if (approval) void handleDeleteApprover(approval, member.userName);
-                            }}
-                            isSaving={saveApproval.isPending || deleteApproval.isPending || createApprovalHistory.isPending}
-                          />
-                        ))}
-                      </TableBody>
-                    </Table>
-                  </div>
-                )}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-base">Approval History</CardTitle>
-            <p className="text-xs text-muted-foreground">
-              Read-only log of every approval and denial related to this idea.
-            </p>
-          </CardHeader>
-          <CardContent>
-            {approvalHistoryLoading ? (
-              <p className="text-sm text-muted-foreground">Loading approval history…</p>
-            ) : approvalHistory.length === 0 ? (
-              <p className="text-sm text-muted-foreground">No approval history yet.</p>
-            ) : (
-              <div className="overflow-x-auto rounded-md border">
-                <Table>
-                  <TableHeader>
-                    <TableRow>
-                      <TableHead>User</TableHead>
-                      <TableHead>Role</TableHead>
-                      <TableHead>Decision</TableHead>
-                      <TableHead>Comments</TableHead>
-                      <TableHead>Date / Time</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {approvalHistory.map((entry) => (
-                      <TableRow key={entry.id}>
-                        <TableCell className="align-top">
-                          <p className="font-medium">{entry.userName}</p>
-                        </TableCell>
-                        <TableCell className="align-top">{entry.roleName}</TableCell>
-                        <TableCell className="align-top">
-                          <Badge variant={APPROVAL_HISTORY_VARIANTS[entry.decision]}>
-                            {APPROVAL_HISTORY_LABELS[entry.decision]}
-                          </Badge>
-                        </TableCell>
-                        <TableCell className="align-top">
-                          <p className="text-sm whitespace-pre-wrap">{entry.comments ?? '—'}</p>
-                        </TableCell>
-                        <TableCell className="align-top text-sm text-muted-foreground">
-                          {formatApprovalDate(entry.reviewedOn)}
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                  </TableBody>
-                </Table>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      </CollapsibleSection>
-
-      <CollapsibleSection
         id="section-realization"
-        title="Section 4: Realized Outcomes"
+        title="Section 5: Realized Outcomes"
         subtitle="Track post-approval delivery outcomes once the idea is in progress or completed."
         open={openSections['section-realization']}
         onToggle={toggleSection}
@@ -1968,64 +2030,6 @@ export default function SubmissionDetailPage() {
           </div>
         </SheetContent>
       </Sheet>
-
-      <Dialog open={platformCarouselOpen} onOpenChange={setPlatformCarouselOpen}>
-        <DialogContent className="sm:max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>{PLATFORM_SLIDES[platformSlideIndex].label}</DialogTitle>
-            <DialogDescription>
-              {platformSlideIndex + 1} of {PLATFORM_SLIDES.length} — use the arrows to browse platform options.
-            </DialogDescription>
-          </DialogHeader>
-
-          <div className="relative flex items-center justify-center">
-            <img
-              src={PLATFORM_SLIDES[platformSlideIndex].src}
-              alt={PLATFORM_SLIDES[platformSlideIndex].label}
-              className="max-h-[60vh] w-auto rounded-md border bg-background"
-            />
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              aria-label="Previous image"
-              className="absolute left-2 top-1/2 -translate-y-1/2 rounded-full shadow"
-              onClick={() =>
-                setPlatformSlideIndex((i) => (i - 1 + PLATFORM_SLIDES.length) % PLATFORM_SLIDES.length)
-              }
-            >
-              <ChevronLeft className="h-5 w-5" />
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="icon"
-              aria-label="Next image"
-              className="absolute right-2 top-1/2 -translate-y-1/2 rounded-full shadow"
-              onClick={() => setPlatformSlideIndex((i) => (i + 1) % PLATFORM_SLIDES.length)}
-            >
-              <ChevronRight className="h-5 w-5" />
-            </Button>
-          </div>
-
-          <div className="flex items-center justify-center gap-2">
-            {PLATFORM_SLIDES.map((slide, i) => (
-              <button
-                key={slide.label}
-                type="button"
-                aria-label={`Go to ${slide.label}`}
-                aria-current={i === platformSlideIndex}
-                onClick={() => setPlatformSlideIndex(i)}
-                className={
-                  i === platformSlideIndex
-                    ? 'h-2 w-6 rounded-full bg-primary transition-all'
-                    : 'h-2 w-2 rounded-full bg-muted-foreground/40 transition-all hover:bg-muted-foreground/70'
-                }
-              />
-            ))}
-          </div>
-        </DialogContent>
-      </Dialog>
 
       <Dialog
         open={blocker.state === 'blocked'}

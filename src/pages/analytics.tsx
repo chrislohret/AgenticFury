@@ -8,7 +8,6 @@ import {
   IDEA_STATUS_LABELS,
   IDEA_STATUS_BADGE_VARIANT,
 } from '@/constants/ideaStatus';
-import { aiPlatformLabel } from '@/constants/aiPlatform';
 import type { IdeaSubmission } from '@/types/domain-models';
 
 const APPROVED_STATUSES = new Set<number>([
@@ -145,7 +144,7 @@ export default function AnalyticsPage() {
         byDepartment.set(dept, deptEntry);
       }
 
-      const platform = aiPlatformLabel(s.aiPlatformSelection);
+      const platform = s.platformName || 'Unspecified';
       byPlatform.set(platform, (byPlatform.get(platform) ?? 0) + 1);
 
       byStatus.set(s.status, (byStatus.get(s.status) ?? 0) + 1);

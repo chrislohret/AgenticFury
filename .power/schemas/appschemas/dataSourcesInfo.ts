@@ -3593,6 +3593,27 @@ export const dataSourcesInfo = {
     "dataSourceType": "Dataverse",
     "apis": {}
   },
+  "afp_platformattributeassignments": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "afp_platformattributeassignmentid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
+  "afp_platformattributes": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "afp_platformattributeid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
+  "afp_platforms": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "afp_platformid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
   "afp_powerplatenvironmentses": {
     "tableId": "",
     "version": "",

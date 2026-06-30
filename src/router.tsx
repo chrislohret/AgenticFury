@@ -13,6 +13,7 @@ import LookupTablesPage from "@/pages/lookup-tables"
 import CoeRolesPage from "@/pages/coe-roles"
 import ScorecardConfigPage from "@/pages/scorecard-config"
 import AiCoeTeamPage from "@/pages/ai-coe-team"
+import PlatformCatalogPage from "@/pages/platform-catalog"
 import NotFoundPage from "@/pages/not-found"
 
 // IMPORTANT: Do not remove or modify the code below!
@@ -46,6 +47,7 @@ export const router = createHashRouter([
       { path: "coe-roles", element: <CoeRolesPage /> },
       { path: "scorecard-config", element: <ScorecardConfigPage /> },
       { path: "ai-coe-team", element: <AiCoeTeamPage /> },
+      { path: "platform-catalog", element: <PlatformCatalogPage /> },
       { path: "submissions/:id", element: <SubmissionDetailPage /> },
       { path: "submissions/:id/scorecard", element: <ScorecardPage /> },
     ],
