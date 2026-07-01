@@ -19,6 +19,7 @@ import type {
   PlatformAttribute,
   PlatformAttributeCategory,
   PlatformAttributeAssignment,
+  SubmissionPlatform,
 } from '@/types/domain-models';
 import type { PowerPlatformEnvironment } from '@/types/domain-models';
 import type { ScorecardDimensionKey } from '@/constants/scorecard';
@@ -154,6 +155,17 @@ export interface PlatformAttributeAssignmentRepository {
 }
 
 /**
+ * Idea↔platform selections (afp_ideaplatform join table). A submission can
+ * select multiple platforms. `setForSubmission` replaces the full set for a
+ * submission; `listAll` powers cross-submission reporting (analytics).
+ */
+export interface SubmissionPlatformRepository {
+  listBySubmission(submissionId: string): Promise<SubmissionPlatform[]>;
+  listAll(): Promise<SubmissionPlatform[]>;
+  setForSubmission(submissionId: string, platformIds: string[]): Promise<void>;
+}
+
+/**
  * Read-only reference list of provisioned Power Platform environments
  * (afp_powerplatenvironments). The UI filters the returned list by zone.
  */
@@ -209,6 +221,7 @@ export interface AppDataProvider {
   platforms: PlatformRepository;
   platformAttributes: PlatformAttributeRepository;
   platformAttributeAssignments: PlatformAttributeAssignmentRepository;
+  submissionPlatforms: SubmissionPlatformRepository;
   directoryUsers: DirectoryUserRepository;
   currentUser: CurrentUserRepository;
   fieldMetadata: FieldMetadataRepository;

@@ -20,6 +20,7 @@ import type {
   PlatformAttribute,
   PlatformAttributeCategory,
   PlatformAttributeAssignment,
+  SubmissionPlatform,
 } from '@/types/domain-models';
 import type { ScorecardDimensionKey } from '@/constants/scorecard';
 import { SUBMISSION_STAGE } from '@/constants/submissionStage';
@@ -51,6 +52,8 @@ export const queryKeys = {
   platformAttributesByCategory: (category: PlatformAttributeCategory) =>
     ['platformAttributes', category] as const,
   platformAssignments: (platformId: string) => ['platformAssignments', platformId] as const,
+  submissionPlatforms: (submissionId: string) => ['submissionPlatforms', submissionId] as const,
+  submissionPlatformsAll: ['submissionPlatforms', 'all'] as const,
 };
 
 export function useIdeaSubmissions() {
@@ -505,6 +508,36 @@ export function useSetPlatformAssignments() {
     onSuccess: (_void, input) => {
       queryClient.invalidateQueries({ queryKey: queryKeys.platformAssignments(input.platformId) });
       queryClient.invalidateQueries({ queryKey: queryKeys.platformsWithAttributes });
+    },
+  });
+}
+
+// ── Submission platform selections (idea ↔ platform, many-to-many) ──────────
+
+export function useSubmissionPlatforms(submissionId: string | undefined, enabled = true) {
+  return useQuery<SubmissionPlatform[]>({
+    queryKey: queryKeys.submissionPlatforms(submissionId || 'none'),
+    queryFn: () => provider.submissionPlatforms.listBySubmission(submissionId as string),
+    enabled: enabled && Boolean(submissionId),
+  });
+}
+
+export function useAllSubmissionPlatforms(enabled = true) {
+  return useQuery<SubmissionPlatform[]>({
+    queryKey: queryKeys.submissionPlatformsAll,
+    queryFn: () => provider.submissionPlatforms.listAll(),
+    enabled,
+  });
+}
+
+export function useSetSubmissionPlatforms() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { submissionId: string; platformIds: string[] }) =>
+      provider.submissionPlatforms.setForSubmission(input.submissionId, input.platformIds),
+    onSuccess: (_void, input) => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.submissionPlatforms(input.submissionId) });
+      queryClient.invalidateQueries({ queryKey: queryKeys.submissionPlatformsAll });
     },
   });
 }

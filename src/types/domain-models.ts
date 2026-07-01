@@ -38,10 +38,20 @@ export interface IdeaSubmission {
    * Retained only for backward compatibility with historical records.
    */
   aiPlatformSelection?: number;
-  /** GUID of the selected platform (afp_platformid lookup → afp_platform). */
+  /**
+   * @deprecated Single-platform selection. Replaced by multi-select
+   * `platformIds`/`platformNames` (afp_ideaplatform join). Kept for
+   * backward compatibility and migration only.
+   */
   platformId?: string | null;
-  /** Display name of the selected platform (expanded from the lookup). */
+  /**
+   * @deprecated Single-platform display name. Use `platformNames`.
+   */
   platformName?: string | null;
+  /** GUIDs of the platforms selected for this idea (afp_ideaplatform join). */
+  platformIds?: string[];
+  /** Display names of the selected platforms (parallel to `platformIds`). */
+  platformNames?: string[];
   /**
    * Environment zone (afp_environmentzone choice). Only meaningful when the AI
    * platform is Copilot Studio; cleared to null otherwise.
@@ -159,6 +169,18 @@ export interface PlatformAttributeAssignment {
   id: string;
   platformId: string;
   attributeId: string;
+}
+
+/**
+ * A join record (afp_ideaplatform) linking an idea submission to a selected
+ * platform (many-to-many). Lets a submission choose multiple platforms.
+ */
+export interface SubmissionPlatform {
+  id: string;
+  submissionId: string;
+  platformId: string;
+  /** Expanded platform display name, when available. */
+  platformName?: string;
 }
 
 /**

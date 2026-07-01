@@ -3565,6 +3565,13 @@ export const dataSourcesInfo = {
     "dataSourceType": "Dataverse",
     "apis": {}
   },
+  "afp_ideaplatforms": {
+    "tableId": "",
+    "version": "",
+    "primaryKey": "afp_ideaplatformid",
+    "dataSourceType": "Dataverse",
+    "apis": {}
+  },
   "afp_idearealizations": {
     "tableId": "",
     "version": "",

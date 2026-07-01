@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useParams, Link, useBlocker } from 'react-router-dom';
-import { ChevronDown, ChevronUp, Trash2, ExternalLink, FileText, MessageSquare, AlertTriangle, CheckCircle2 } from 'lucide-react';
+import { ChevronDown, ChevronUp, Trash2, ExternalLink, FileText, MessageSquare, AlertTriangle, CheckCircle2, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -48,6 +48,8 @@ import {
   useIdeaRealization,
   useSaveIdeaRealization,
   usePlatformsWithAttributes,
+  useSubmissionPlatforms,
+  useSetSubmissionPlatforms,
 } from '@/hooks/usePrototypeData';
 import {
   submissionStageLabel,
@@ -559,6 +561,8 @@ export default function SubmissionDetailPage() {
   const departmentOptions = useLookupOptions('departments', canLoadRelatedData);
   const aiCoeRoleOptions = useAiCoeRoles(canLoadRelatedData);
   const platforms = usePlatformsWithAttributes(canLoadRelatedData);
+  const { data: submissionPlatforms = [] } = useSubmissionPlatforms(relatedSubmissionId);
+  const setSubmissionPlatforms = useSetSubmissionPlatforms();
 
   const [form, setForm] = useState<StructuredFormState>(EMPTY_STRUCTURED_FORM);
   const [newNoteText, setNewNoteText] = useState('');
@@ -573,7 +577,7 @@ export default function SubmissionDetailPage() {
   const [pdfEdited, setPdfEdited] = useState(false);
   const estimatedCostsFileInputRef = useRef<HTMLInputElement | null>(null);
   const [overallCostsForm, setOverallCostsForm] = useState<OverallCostsFormState>(EMPTY_OVERALL_COSTS_FORM);
-  const [selectedPlatformId, setSelectedPlatformId] = useState<string>('');
+  const [selectedPlatformIds, setSelectedPlatformIds] = useState<string[]>([]);
   const [assignedReviewerId, setAssignedReviewerId] = useState<string>('');
   const [realizationForm, setRealizationForm] = useState({
     actualMonthlyCost: '',
@@ -584,9 +588,9 @@ export default function SubmissionDetailPage() {
 
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
     'section-copilot': false,
-    'section-intake': true,
+    'section-intake': false,
     'section-platform': false,
-    'section-scorecard': true,
+    'section-scorecard': false,
     'section-approvals': false,
     'section-costs': false,
     'section-realization': false,
@@ -672,7 +676,6 @@ export default function SubmissionDetailPage() {
       dataSourceCost: submission?.dataSourceCost?.toString() ?? '',
       dataSourceNotes: submission?.dataSourceNotes ?? '',
     });
-    setSelectedPlatformId(submission?.platformId ?? '');
   }, [
     submission?.monthlyCopilotCreditsCost,
     submission?.monthlyCopilotCreditsNotes,
@@ -680,8 +683,18 @@ export default function SubmissionDetailPage() {
     submission?.userBasedLicensingNotes,
     submission?.dataSourceCost,
     submission?.dataSourceNotes,
-    submission?.platformId,
   ]);
+
+  // Hydrate the multi-select platform choices from the server join data. Keyed
+  // on a stable primitive so it re-syncs when the persisted set changes without
+  // looping on the `= []` default array's fresh reference each render.
+  const loadedPlatformKey = submissionPlatforms
+    .map((row) => row.platformId)
+    .sort()
+    .join('|');
+  useEffect(() => {
+    setSelectedPlatformIds(loadedPlatformKey ? loadedPlatformKey.split('|') : []);
+  }, [loadedPlatformKey]);
 
   const activeBusinessObjectiveOptions = useMemo(
     () => (businessObjectiveOptions.data ?? []).filter((option) => option.isActive),
@@ -951,8 +964,18 @@ export default function SubmissionDetailPage() {
         userBasedLicensingNotes: normalizedOverallCosts.userBasedLicensingNotes || undefined,
         dataSourceCost: parseCost(normalizedOverallCosts.dataSourceCost),
         dataSourceNotes: normalizedOverallCosts.dataSourceNotes || undefined,
-        platformId: selectedPlatformId || null,
       });
+
+      // Persist the multi-select platform choices (afp_ideaplatform join) when
+      // they changed from what was loaded.
+      const platformsChanged =
+        [...selectedPlatformIds].sort().join('|') !== loadedPlatformKey;
+      if (platformsChanged) {
+        await setSubmissionPlatforms.mutateAsync({
+          submissionId: relatedSubmissionId,
+          platformIds: selectedPlatformIds,
+        });
+      }
 
       if (structuredChanged) {
         await saveStructuredReview.mutateAsync({
@@ -1349,7 +1372,7 @@ export default function SubmissionDetailPage() {
 
       <CollapsibleSection
         id="section-intake"
-        title="Section 1: Submitted Idea + Normalized Idea"
+        title="Submitted Idea + Normalized Idea"
         subtitle="Read-only original idea details and editable structured CoE intake."
         open={openSections['section-intake']}
         onToggle={toggleSection}
@@ -1437,8 +1460,8 @@ export default function SubmissionDetailPage() {
 
       <CollapsibleSection
         id="section-platform"
-        title="Section 2: Platform Selection"
-        subtitle="Choose the target AI platform for this idea."
+        title="Platform Selection"
+        subtitle="Choose one or more target AI platforms for this idea."
         open={openSections['section-platform']}
         onToggle={toggleSection}
       >
@@ -1447,7 +1470,7 @@ export default function SubmissionDetailPage() {
             <CardTitle className="text-base">Platform Selection</CardTitle>
             <p className="text-xs text-muted-foreground">
               Review each platform&rsquo;s capabilities, decision criteria, and cost mechanisms, then
-              select the best fit for this idea.
+              select every platform that fits this idea.
             </p>
           </CardHeader>
           <CardContent>
@@ -1461,16 +1484,20 @@ export default function SubmissionDetailPage() {
             ) : (
               <div className="max-h-[28rem] overflow-y-auto pr-1 space-y-3">
                 {(platforms.data ?? [])
-                  .filter((platform) => platform.isActive || platform.id === selectedPlatformId)
+                  .filter((platform) => platform.isActive || selectedPlatformIds.includes(platform.id))
                   .map((platform) => {
-                    const isSelected = selectedPlatformId === platform.id;
+                    const isSelected = selectedPlatformIds.includes(platform.id);
                     return (
                       <button
                         key={platform.id}
                         type="button"
                         onClick={() => {
                           markEdited();
-                          setSelectedPlatformId(platform.id);
+                          setSelectedPlatformIds((prev) =>
+                            prev.includes(platform.id)
+                              ? prev.filter((id) => id !== platform.id)
+                              : [...prev, platform.id],
+                          );
                         }}
                         disabled={saveIdeaSubmission.isPending}
                         aria-pressed={isSelected}
@@ -1484,11 +1511,13 @@ export default function SubmissionDetailPage() {
                         <div className="flex items-start gap-3">
                           <span
                             className={cn(
-                              'mt-0.5 h-4 w-4 shrink-0 rounded-full border-2',
-                              isSelected ? 'border-primary bg-primary' : 'border-muted-foreground',
+                              'mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded border-2',
+                              isSelected ? 'border-primary bg-primary text-primary-foreground' : 'border-muted-foreground',
                             )}
                             aria-hidden
-                          />
+                          >
+                            {isSelected && <Check className="h-3 w-3" />}
+                          </span>
                           <div className="flex-1 min-w-0 space-y-3">
                             <div>
                               <div className="font-medium">{platform.name}</div>
@@ -1576,7 +1605,7 @@ export default function SubmissionDetailPage() {
 
       <CollapsibleSection
         id="section-approvals"
-        title="Section 3: Contributors"
+        title="Contributors"
         subtitle="Contributors and their comments for this idea."
         open={openSections['section-approvals']}
         onToggle={toggleSection}
@@ -1694,7 +1723,7 @@ export default function SubmissionDetailPage() {
 
       <CollapsibleSection
         id="section-costs"
-        title="Section 4: Estimated Costs"
+        title="Estimated Costs"
         subtitle="Capture agent credit costs and overall cost estimates with supporting notes."
         open={openSections['section-costs']}
         onToggle={toggleSection}
@@ -1884,7 +1913,7 @@ export default function SubmissionDetailPage() {
 
       <CollapsibleSection
         id="section-realization"
-        title="Section 5: Realized Outcomes"
+        title="Realized Outcomes"
         subtitle="Track post-approval delivery outcomes once the idea is in progress or completed."
         open={openSections['section-realization']}
         onToggle={toggleSection}

@@ -32,6 +32,7 @@ import type {
   PlatformAttribute,
   PlatformAttributeCategory,
   PlatformAttributeAssignment,
+  SubmissionPlatform,
   StageStatus,
 } from '@/types/domain-models';
 
@@ -58,6 +59,7 @@ const TABLES = {
   platform: 'afp_platforms',
   platformAttribute: 'afp_platformattributes',
   platformAssignment: 'afp_platformattributeassignments',
+  ideaPlatform: 'afp_ideaplatforms',
   notes: 'annotations',
   systemUser: 'systemusers',
 } as const;
@@ -459,6 +461,7 @@ function getRecordGuid(record: DataverseRecord): string {
       record.afp_platformid ??
       record.afp_platformattributeid ??
       record.afp_platformattributeassignmentid ??
+      record.afp_ideaplatformid ??
       record.annotationid ??
       record.systemuserid ??
       record.id,
@@ -871,6 +874,21 @@ async function getPlatformAssignmentRows(): Promise<PlatformAttributeAssignment[
   }));
 }
 
+async function getSubmissionPlatformRows(): Promise<SubmissionPlatform[]> {
+  // afp_submissionid and afp_platformid are lookups → read the _value form and
+  // the platform name from the formatted-value annotation.
+  return (await listRows(
+    TABLES.ideaPlatform,
+    selectFields(['afp_ideaplatformid', '_afp_submissionid_value', '_afp_platformid_value']),
+  )).map((record) => ({
+    id: getRecordGuid(record),
+    submissionId: normalizeId(record._afp_submissionid_value),
+    platformId: normalizeId(record._afp_platformid_value),
+    platformName:
+      normalizeText(record['_afp_platformid_value@OData.Community.Display.V1.FormattedValue']) || undefined,
+  }));
+}
+
 async function getStructuredReviewSelections(reviewId: string): Promise<LookupOption[]> {
   const selections = await listRows(
     TABLES.structuredReviewSelection,
@@ -1006,15 +1024,6 @@ export function createRealDataProvider(): AppDataProvider {
           body['afp_PowerPlatformEnvironment@odata.bind'] = `/${TABLES.powerPlatEnv}(${nextEnvironmentId})`;
         }
 
-        // Platform is a lookup to afp_platforms (the configurable platform
-        // catalog). Bind when set; preserve the existing value when the caller
-        // doesn't touch it. Clearing is handled after the upsert (see below).
-        const nextPlatformId =
-          input.platformId !== undefined ? input.platformId : existing?.platformId ?? null;
-        if (nextPlatformId) {
-          body['afp_PlatformId@odata.bind'] = `/${TABLES.platform}(${nextPlatformId})`;
-        }
-
         await upsertRow(TABLES.idea, id, body);
 
         // A single-valued lookup can't be nulled through the PATCH body. When the
@@ -1026,21 +1035,6 @@ export function createRealDataProvider(): AppDataProvider {
               TABLES.idea,
               id,
               'afp_PowerPlatformEnvironment',
-              '',
-            );
-          } catch {
-            // The reference may already be empty; ignore.
-          }
-        }
-
-        // Likewise, explicitly clearing the platform requires a disassociate.
-        if (input.platformId !== undefined && !input.platformId) {
-          try {
-            await MicrosoftDataverseService.DisassociateEntitiesWithOrganization(
-              ORG_URL,
-              TABLES.idea,
-              id,
-              'afp_PlatformId',
               '',
             );
           } catch {
@@ -1786,6 +1780,39 @@ export function createRealDataProvider(): AppDataProvider {
               afp_name: `${platformId}:${attributeId}`,
               'afp_PlatformId@odata.bind': `/${TABLES.platform}(${platformId})`,
               'afp_AttributeId@odata.bind': `/${TABLES.platformAttribute}(${attributeId})`,
+            });
+          }),
+        );
+      },
+    },
+    submissionPlatforms: {
+      async listBySubmission(submissionId: string) {
+        return (await getSubmissionPlatformRows()).filter((row) => row.submissionId === submissionId);
+      },
+      async listAll() {
+        return getSubmissionPlatformRows();
+      },
+      async setForSubmission(submissionId: string, platformIds: string[]) {
+        const existing = (await getSubmissionPlatformRows()).filter(
+          (row) => row.submissionId === submissionId,
+        );
+        await Promise.all(
+          existing.map((row) =>
+            MicrosoftDataverseService.DeleteRecordWithOrganization(
+              ORG_URL,
+              TABLES.ideaPlatform,
+              row.id,
+            ),
+          ),
+        );
+        const uniqueIds = [...new Set(platformIds)];
+        await Promise.all(
+          uniqueIds.map((platformId) => {
+            const rowId = crypto.randomUUID();
+            return upsertRow(TABLES.ideaPlatform, rowId, {
+              afp_name: `${submissionId}:${platformId}`,
+              'afp_SubmissionId@odata.bind': `/${TABLES.idea}(${submissionId})`,
+              'afp_PlatformId@odata.bind': `/${TABLES.platform}(${platformId})`,
             });
           }),
         );

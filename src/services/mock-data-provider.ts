@@ -17,6 +17,7 @@ import type {
   PlatformRepository,
   PlatformAttributeRepository,
   PlatformAttributeAssignmentRepository,
+  SubmissionPlatformRepository,
 } from '@/services/data-contracts';
 import type {
   IdeaSubmission,
@@ -39,6 +40,7 @@ import type {
   PlatformAttribute,
   PlatformAttributeCategory,
   PlatformAttributeAssignment,
+  SubmissionPlatform,
 } from '@/types/domain-models';
 import type { PowerPlatformEnvironment } from '@/types/domain-models';
 import { AI_COE_FULL_TEAM_NAME } from '@/constants/security';
@@ -57,6 +59,7 @@ import { mockIdeaRealizations } from '@/mockData/ideaRealization';
 import { mockPlatforms } from '@/mockData/platform';
 import { mockPlatformAttributes } from '@/mockData/platformAttribute';
 import { mockPlatformAttributeAssignments } from '@/mockData/platformAttributeAssignment';
+import { mockSubmissionPlatforms } from '@/mockData/submissionPlatform';
 import { computeWeightedTotal, weightsListToMap } from '@/lib/scorecard';
 
 function cloneRecord<T>(record: T): T {
@@ -571,6 +574,32 @@ function createPlatformAttributeAssignmentRepository(
   };
 }
 
+function createSubmissionPlatformRepository(
+  rows: SubmissionPlatform[],
+  platforms: Platform[],
+): SubmissionPlatformRepository {
+  function withName(row: SubmissionPlatform): SubmissionPlatform {
+    const platform = platforms.find((p) => p.id === row.platformId);
+    return { ...row, platformName: platform?.name };
+  }
+  return {
+    async listBySubmission(submissionId: string) {
+      return rows.filter((r) => r.submissionId === submissionId).map(withName);
+    },
+    async listAll() {
+      return rows.map(withName);
+    },
+    async setForSubmission(submissionId: string, platformIds: string[]) {
+      for (let i = rows.length - 1; i >= 0; i -= 1) {
+        if (rows[i].submissionId === submissionId) rows.splice(i, 1);
+      }
+      for (const platformId of new Set(platformIds)) {
+        rows.push({ id: crypto.randomUUID(), submissionId, platformId });
+      }
+    },
+  };
+}
+
 function createAiCoeTeamRepository(records: AiCoeTeamMember[]): AiCoeTeamRepository {
   return {
     async list() {
@@ -661,6 +690,7 @@ export function createMockDataProvider(): AppDataProvider {
   const platformStore = mockPlatforms.map(cloneRecord);
   const platformAttributeStore = mockPlatformAttributes.map(cloneRecord);
   const platformAssignmentStore = mockPlatformAttributeAssignments.map(cloneRecord);
+  const submissionPlatformStore = mockSubmissionPlatforms.map(cloneRecord);
 
   return {
     ideaSubmissions: createIdeaSubmissionRepository(ideaStore),
@@ -678,6 +708,7 @@ export function createMockDataProvider(): AppDataProvider {
     platforms: createPlatformRepository(platformStore, platformAttributeStore, platformAssignmentStore),
     platformAttributes: createPlatformAttributeRepository(platformAttributeStore),
     platformAttributeAssignments: createPlatformAttributeAssignmentRepository(platformAssignmentStore),
+    submissionPlatforms: createSubmissionPlatformRepository(submissionPlatformStore, platformStore),
     directoryUsers: createDirectoryUserRepository(usersStore),    currentUser: {
       // Mock mode treats the local user as a member of the AI CoE Team Full
       // team so admin-only navigation is exercisable during prototype dev.

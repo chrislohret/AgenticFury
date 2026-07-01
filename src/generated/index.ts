@@ -10,6 +10,7 @@ export * as Afp_approvalhistoryentriesModel from './models/Afp_approvalhistoryen
 export * as Afp_approvalstagerecordsModel from './models/Afp_approvalstagerecordsModel';
 export * as Afp_coestructuredreviewsModel from './models/Afp_coestructuredreviewsModel';
 export * as Afp_coestructuredreviewselectionsModel from './models/Afp_coestructuredreviewselectionsModel';
+export * as Afp_ideaplatformsModel from './models/Afp_ideaplatformsModel';
 export * as Afp_idearealizationsModel from './models/Afp_idearealizationsModel';
 export * as Afp_idearequirementsModel from './models/Afp_idearequirementsModel';
 export * as Afp_ideascorecardsModel from './models/Afp_ideascorecardsModel';
@@ -30,6 +31,7 @@ export * from './services/Afp_approvalhistoryentriesService';
 export * from './services/Afp_approvalstagerecordsService';
 export * from './services/Afp_coestructuredreviewsService';
 export * from './services/Afp_coestructuredreviewselectionsService';
+export * from './services/Afp_ideaplatformsService';
 export * from './services/Afp_idearealizationsService';
 export * from './services/Afp_idearequirementsService';
 export * from './services/Afp_ideascorecardsService';

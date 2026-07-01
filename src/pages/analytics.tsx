@@ -2,7 +2,7 @@ import { useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { Badge } from '@/components/ui/badge';
-import { useIdeaSubmissions } from '@/hooks/usePrototypeData';
+import { useIdeaSubmissions, useAllSubmissionPlatforms } from '@/hooks/usePrototypeData';
 import {
   IDEA_STATUS,
   IDEA_STATUS_LABELS,
@@ -103,6 +103,7 @@ function BarRow({
 
 export default function AnalyticsPage() {
   const { data: submissions = [], isLoading } = useIdeaSubmissions();
+  const { data: allSubmissionPlatforms = [] } = useAllSubmissionPlatforms();
 
   const stats = useMemo(() => {
     const total = submissions.length;
@@ -127,6 +128,17 @@ export default function AnalyticsPage() {
     const byStatus = new Map<number, number>();
     const byMonth = new Map<string, number>();
 
+    // Group each submission's selected platforms (afp_ideaplatform join). A
+    // submission can select multiple platforms, so it contributes to each
+    // platform's count (platform counts may therefore exceed the total).
+    const platformNamesBySubmission = new Map<string, string[]>();
+    for (const row of allSubmissionPlatforms) {
+      const name = row.platformName || 'Unspecified';
+      const list = platformNamesBySubmission.get(row.submissionId) ?? [];
+      list.push(name);
+      platformNamesBySubmission.set(row.submissionId, list);
+    }
+
     for (const s of submissions) {
       // Prefer the CoE-normalized departments; fall back to the raw intake
       // department, then to 'Unspecified'. An idea spanning multiple
@@ -144,8 +156,11 @@ export default function AnalyticsPage() {
         byDepartment.set(dept, deptEntry);
       }
 
-      const platform = s.platformName || 'Unspecified';
-      byPlatform.set(platform, (byPlatform.get(platform) ?? 0) + 1);
+      const platformNames = platformNamesBySubmission.get(s.id);
+      const platforms = platformNames && platformNames.length > 0 ? platformNames : ['Unspecified'];
+      for (const platform of platforms) {
+        byPlatform.set(platform, (byPlatform.get(platform) ?? 0) + 1);
+      }
 
       byStatus.set(s.status, (byStatus.get(s.status) ?? 0) + 1);
 
@@ -185,7 +200,7 @@ export default function AnalyticsPage() {
       statuses,
       months,
     };
-  }, [submissions]);
+  }, [submissions, allSubmissionPlatforms]);
 
   if (isLoading) {
     return (

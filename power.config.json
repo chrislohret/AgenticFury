@@ -91,6 +91,10 @@
         "platformattributeassignments": {
           "entitySetName": "afp_platformattributeassignments",
           "logicalName": "afp_platformattributeassignment"
+        },
+        "ideaplatforms": {
+          "entitySetName": "afp_ideaplatforms",
+          "logicalName": "afp_ideaplatform"
         }
       },
       "environmentVariableName": ""
