@@ -21,7 +21,7 @@ import {
 } from '@/components/ui/dialog';
 import { CopilotAssistantPanel } from '@/components/copilot-assistant-panel';
 import { SubmissionProcessFlow } from '@/components/SubmissionProcessFlow';
-import { useCurrentUser } from '@/hooks/useCurrentUser';
+import { useCurrentUser, useIsCoeAdmin } from '@/hooks/useCurrentUser';
 import { toast } from 'sonner';
 import {
   Select,
@@ -50,6 +50,7 @@ import {
   usePlatformsWithAttributes,
   useSubmissionPlatforms,
   useSetSubmissionPlatforms,
+  useRequestCostWorkbook,
 } from '@/hooks/usePrototypeData';
 import {
   submissionStageLabel,
@@ -518,7 +519,7 @@ const OUTCOME_RATING_OPTIONS: { value: IdeaOutcomeRating; label: string }[] = [
 
 export default function SubmissionDetailPage() {
   const { id } = useParams<{ id: string }>();
-  const { data: submission, isLoading } = useIdeaSubmission(id);
+  const { data: submission, isLoading, refetch: refetchSubmission } = useIdeaSubmission(id);
   const relatedSubmissionId = submission?.id;
   const canLoadRelatedData = Boolean(relatedSubmissionId);
   const saveIdeaSubmission = useSaveIdeaSubmission();
@@ -563,6 +564,9 @@ export default function SubmissionDetailPage() {
   const platforms = usePlatformsWithAttributes(canLoadRelatedData);
   const { data: submissionPlatforms = [] } = useSubmissionPlatforms(relatedSubmissionId);
   const setSubmissionPlatforms = useSetSubmissionPlatforms();
+  const { isAdmin: isCoeUser } = useIsCoeAdmin();
+  const createCostWorkbook = useRequestCostWorkbook();
+  const [awaitingWorkbook, setAwaitingWorkbook] = useState(false);
 
   const [form, setForm] = useState<StructuredFormState>(EMPTY_STRUCTURED_FORM);
   const [newNoteText, setNewNoteText] = useState('');
@@ -695,6 +699,30 @@ export default function SubmissionDetailPage() {
   useEffect(() => {
     setSelectedPlatformIds(loadedPlatformKey ? loadedPlatformKey.split('|') : []);
   }, [loadedPlatformKey]);
+
+  // While a cost workbook is being created by the flow, poll the idea record
+  // until its URL is written back (or time out). We do NOT auto-open (popup
+  // blockers reject window.open outside a user gesture) — the pane just flips
+  // to an "Open cost workbook" button.
+  useEffect(() => {
+    if (!awaitingWorkbook) return;
+    if (submission?.costWorkbookUrl) {
+      setAwaitingWorkbook(false);
+      toast.success('Cost workbook is ready.');
+      return;
+    }
+    const startedAt = Date.now();
+    const interval = setInterval(() => {
+      if (Date.now() - startedAt > 90000) {
+        clearInterval(interval);
+        setAwaitingWorkbook(false);
+        toast.message('Still preparing the cost workbook — check back shortly.');
+        return;
+      }
+      void refetchSubmission();
+    }, 3000);
+    return () => clearInterval(interval);
+  }, [awaitingWorkbook, submission?.costWorkbookUrl, refetchSubmission]);
 
   const activeBusinessObjectiveOptions = useMemo(
     () => (businessObjectiveOptions.data ?? []).filter((option) => option.isActive),
@@ -1049,6 +1077,18 @@ export default function SubmissionDetailPage() {
   async function handleSaveAndLeave() {
     const ok = await handleSaveAll();
     if (ok) blocker.proceed?.();
+  }
+
+  async function handleCreateCostWorkbook() {
+    if (!submission) return;
+    try {
+      await createCostWorkbook.mutateAsync({ submissionId: submission.id });
+      setAwaitingWorkbook(true);
+      toast.info('Creating the cost workbook… this can take a moment.');
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Unknown error.';
+      toast.error(`Unable to request cost workbook: ${message}`);
+    }
   }
 
   function handleEstimatedCostsPdfUpload(event: React.ChangeEvent<HTMLInputElement>) {
@@ -1728,6 +1768,51 @@ export default function SubmissionDetailPage() {
         open={openSections['section-costs']}
         onToggle={toggleSection}
       >
+        {/* Per-submission SharePoint cost workbook. SharePoint blocks inline
+            framing, so the workbook opens in a new tab. A CoE user creates it
+            on demand; the reference is stored on the idea record. */}
+        <Card>
+          <CardHeader className="flex-row items-start justify-between gap-4 space-y-0">
+            <div className="space-y-1">
+              <CardTitle className="text-base">Cost Workbook</CardTitle>
+              <p className="text-xs text-muted-foreground">
+                {submission.costWorkbookUrl
+                  ? 'A SharePoint Excel workbook holds this submission\u2019s detailed cost estimate. It opens in a new tab.'
+                  : 'Create a SharePoint Excel workbook to capture this submission\u2019s detailed cost estimate.'}
+              </p>
+            </div>
+            {submission.costWorkbookUrl ? (
+              <Button size="sm" asChild>
+                <a href={submission.costWorkbookUrl} target="_blank" rel="noopener noreferrer">
+                  <ExternalLink className="mr-1.5 h-4 w-4" />
+                  Open cost workbook
+                </a>
+              </Button>
+            ) : isCoeUser ? (
+              <Button
+                size="sm"
+                onClick={handleCreateCostWorkbook}
+                disabled={createCostWorkbook.isPending || awaitingWorkbook}
+              >
+                {createCostWorkbook.isPending || awaitingWorkbook ? 'Creating…' : 'Create cost workbook'}
+              </Button>
+            ) : null}
+          </CardHeader>
+          {submission.costWorkbookUrl ? (
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                {submission.costWorkbookName ?? 'Cost workbook'}
+              </p>
+            </CardContent>
+          ) : !isCoeUser ? (
+            <CardContent>
+              <p className="text-sm text-muted-foreground">
+                A CoE reviewer can create the cost workbook for this submission.
+              </p>
+            </CardContent>
+          ) : null}
+        </Card>
+
         <Card className="bg-muted/30">
           <CardHeader>
             <CardTitle className="text-base">Agent Credit Costs</CardTitle>

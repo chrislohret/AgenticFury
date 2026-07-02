@@ -542,6 +542,26 @@ export function useSetSubmissionPlatforms() {
   });
 }
 
+// ── Cost workbook (per-submission SharePoint Excel file) ─────────────────────
+
+export function useRequestCostWorkbook() {
+  const queryClient = useQueryClient();
+  return useMutation({
+    mutationFn: (input: { submissionId: string }) =>
+      provider.costWorkbooks.requestForSubmission(input.submissionId),
+    onSuccess: (_result, input) => {
+      // The flow writes the workbook reference back onto the idea; refetch the
+      // detail so polling picks up costWorkbookUrl when it lands.
+      queryClient.invalidateQueries({
+        predicate: (q) =>
+          Array.isArray(q.queryKey) &&
+          q.queryKey[0] === 'ideaSubmissions' &&
+          q.queryKey[1] === input.submissionId,
+      });
+    },
+  });
+}
+
 export function useSaveAiCoeTeamMember() {
   const queryClient = useQueryClient();
   return useMutation({

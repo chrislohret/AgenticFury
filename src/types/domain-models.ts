@@ -33,6 +33,12 @@ export interface IdeaSubmission {
   dataSourceCost?: number;
   dataSourceNotes?: string;
   overallCostNotesHtml?: string;
+  /** Web URL of this submission's SharePoint cost workbook (afp_costworkbookurl). */
+  costWorkbookUrl?: string | null;
+  /** SharePoint UniqueId (GUID) of the cost workbook (afp_costworkbookuniqueid). */
+  costWorkbookUniqueId?: string | null;
+  /** File name of the cost workbook (afp_costworkbookname). */
+  costWorkbookName?: string | null;
   /**
    * @deprecated Replaced by the configurable platform catalog (`platformId`).
    * Retained only for backward compatibility with historical records.

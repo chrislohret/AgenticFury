@@ -521,6 +521,9 @@ function mapIdeaSubmission(record: DataverseRecord, imageUrl?: string, pdfUrl?: 
     dataSourceCost: normalizeNumber(safeRecord.afp_datasourcecost),
     dataSourceNotes: normalizeText(safeRecord.afp_datasourcenotes) || undefined,
     overallCostNotesHtml: normalizeText(safeRecord.afp_overallcostnoteshtml) || undefined,
+    costWorkbookUrl: normalizeText(safeRecord.afp_costworkbookurl) || null,
+    costWorkbookUniqueId: normalizeText(safeRecord.afp_costworkbookuniqueid) || null,
+    costWorkbookName: normalizeText(safeRecord.afp_costworkbookname) || null,
     aiPlatformSelection: normalizeNumber(safeRecord.afp_aiplatformselection),
     platformId: normalizeId(safeRecord._afp_platformid_value) || null,
     platformName:
@@ -773,6 +776,9 @@ async function listIdeaRecords(): Promise<DataverseRecord[]> {
       'afp_datasourcecost',
       'afp_datasourcenotes',
       'afp_overallcostnoteshtml',
+      'afp_costworkbookurl',
+      'afp_costworkbookuniqueid',
+      'afp_costworkbookname',
       'afp_aiplatformselection',
       '_afp_platformid_value',
       'afp_environmentzone',
@@ -815,6 +821,9 @@ async function getIdeaRecordById(id: string): Promise<DataverseRecord | null> {
       'afp_datasourcecost',
       'afp_datasourcenotes',
       'afp_overallcostnoteshtml',
+      'afp_costworkbookurl',
+      'afp_costworkbookuniqueid',
+      'afp_costworkbookname',
       'afp_aiplatformselection',
       '_afp_platformid_value',
       'afp_environmentzone',
@@ -1816,6 +1825,14 @@ export function createRealDataProvider(): AppDataProvider {
             });
           }),
         );
+      },
+    },
+    costWorkbooks: {
+      async requestForSubmission(submissionId: string) {
+        // Flag the idea so the cost-workbook Power Automate flow (Dataverse
+        // trigger on afp_costworkbookrequested = true) copies the template and
+        // writes afp_costworkbookurl/name/uniqueid back onto the record.
+        await upsertRow(TABLES.idea, submissionId, { afp_costworkbookrequested: true });
       },
     },
     directoryUsers: {

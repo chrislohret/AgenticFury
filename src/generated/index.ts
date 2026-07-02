@@ -21,6 +21,7 @@ export * as Afp_platformsModel from './models/Afp_platformsModel';
 export * as Afp_powerplatenvironmentsesModel from './models/Afp_powerplatenvironmentsesModel';
 export * as Afp_scorecardweightsModel from './models/Afp_scorecardweightsModel';
 export * as CommonModels from './models/CommonModels';
+export * as DocumentsModel from './models/DocumentsModel';
 export * as MicrosoftCopilotStudioModel from './models/MicrosoftCopilotStudioModel';
 export * as MicrosoftDataverseModel from './models/MicrosoftDataverseModel';
 
@@ -41,5 +42,6 @@ export * from './services/Afp_platformattributesService';
 export * from './services/Afp_platformsService';
 export * from './services/Afp_powerplatenvironmentsesService';
 export * from './services/Afp_scorecardweightsService';
+export * from './services/DocumentsService';
 export * from './services/MicrosoftCopilotStudioService';
 export * from './services/MicrosoftDataverseService';

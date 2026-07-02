@@ -166,6 +166,18 @@ export interface SubmissionPlatformRepository {
 }
 
 /**
+ * Per-submission SharePoint cost workbook. `requestForSubmission` flags the idea
+ * so a Dataverse-triggered Power Automate flow copies the template into the
+ * destination folder and writes the workbook URL back onto the idea. The app
+ * polls the idea record until `costWorkbookUrl` is populated, then opens it in a
+ * new tab (SharePoint blocks inline framing). In mock mode the reference is set
+ * immediately.
+ */
+export interface CostWorkbookRepository {
+  requestForSubmission(submissionId: string): Promise<void>;
+}
+
+/**
  * Read-only reference list of provisioned Power Platform environments
  * (afp_powerplatenvironments). The UI filters the returned list by zone.
  */
@@ -222,6 +234,7 @@ export interface AppDataProvider {
   platformAttributes: PlatformAttributeRepository;
   platformAttributeAssignments: PlatformAttributeAssignmentRepository;
   submissionPlatforms: SubmissionPlatformRepository;
+  costWorkbooks: CostWorkbookRepository;
   directoryUsers: DirectoryUserRepository;
   currentUser: CurrentUserRepository;
   fieldMetadata: FieldMetadataRepository;

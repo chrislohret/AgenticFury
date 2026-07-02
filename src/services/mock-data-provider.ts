@@ -18,6 +18,7 @@ import type {
   PlatformAttributeRepository,
   PlatformAttributeAssignmentRepository,
   SubmissionPlatformRepository,
+  CostWorkbookRepository,
 } from '@/services/data-contracts';
 import type {
   IdeaSubmission,
@@ -574,6 +575,26 @@ function createPlatformAttributeAssignmentRepository(
   };
 }
 
+function createCostWorkbookRepository(ideas: IdeaSubmission[]): CostWorkbookRepository {
+  return {
+    async requestForSubmission(submissionId: string) {
+      // Mock mode simulates the flow completing instantly: set the workbook
+      // reference on the idea so the next refetch flips the pane to "Open".
+      const index = ideas.findIndex((i) => i.id === submissionId);
+      if (index >= 0) {
+        const ref = ideas[index].submissionRef || submissionId;
+        const name = `${ref}.xlsx`;
+        ideas[index] = {
+          ...ideas[index],
+          costWorkbookUrl: `https://contoso.sharepoint.com/sites/AgenticFury/Shared%20Documents/SubmissionCosts/${encodeURIComponent(name)}`,
+          costWorkbookUniqueId: crypto.randomUUID(),
+          costWorkbookName: name,
+        };
+      }
+    },
+  };
+}
+
 function createSubmissionPlatformRepository(
   rows: SubmissionPlatform[],
   platforms: Platform[],
@@ -709,6 +730,7 @@ export function createMockDataProvider(): AppDataProvider {
     platformAttributes: createPlatformAttributeRepository(platformAttributeStore),
     platformAttributeAssignments: createPlatformAttributeAssignmentRepository(platformAssignmentStore),
     submissionPlatforms: createSubmissionPlatformRepository(submissionPlatformStore, platformStore),
+    costWorkbooks: createCostWorkbookRepository(ideaStore),
     directoryUsers: createDirectoryUserRepository(usersStore),    currentUser: {
       // Mock mode treats the local user as a member of the AI CoE Team Full
       // team so admin-only navigation is exercisable during prototype dev.

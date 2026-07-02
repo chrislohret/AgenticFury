@@ -27,6 +27,22 @@
       ],
       "authenticationType": "oauthDefault",
       "dataSets": {}
+    },
+    "42cb5532-b74f-40f7-90e4-aa068c99f7bc": {
+      "id": "/providers/Microsoft.PowerApps/apis/shared_sharepointonline",
+      "displayName": "SharePoint",
+      "dataSources": [
+        "documents"
+      ],
+      "dataSets": {
+        "https://msftbapb2bcommercial.sharepoint.com/sites/AgenticFury": {
+          "dataSources": {
+            "documents": {
+              "tableName": "Documents"
+            }
+          }
+        }
+      }
     }
   },
   "databaseReferences": {
